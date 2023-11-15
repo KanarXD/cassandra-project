@@ -1,0 +1,39 @@
+version: "3"
+
+services:
+  cassandra-0:
+    image: &cassandra-image "cassandra:3.11.9"
+    container_name: "cassandra-0"
+    ports:
+      - "9042:9042"
+    environment: &cassandra-env
+      MAX_HEAP_SIZE: 256M
+      HEAP_NEWSIZE: 128M
+      CASSANDRA_SEEDS: cassandra-0,cassandra-1
+    volumes:
+      - "cassandra-0:/var/lib/cassandra"
+
+  cassandra-1:
+    image: *cassandra-image
+    container_name: "cassandra-1"
+    environment:
+      <<: *cassandra-env
+    volumes:
+      - "cassandra-1:/var/lib/cassandra"
+    depends_on:
+      - "cassandra-0"
+
+  cassandra-2:
+    image: *cassandra-image
+    container_name: "cassandra-2"
+    environment:
+      <<: *cassandra-env
+    volumes:
+      - "cassandra-2:/var/lib/cassandra"
+    depends_on:
+      - "cassandra-1"
+
+volumes:
+  cassandra-0:
+  cassandra-1:
+  cassandra-2:
