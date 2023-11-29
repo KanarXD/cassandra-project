@@ -1,13 +1,14 @@
 package edu.put;
 
-import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.BoundStatement;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
 import edu.put.backend.BackendConfig;
 import edu.put.backend.BackendException;
 import edu.put.backend.BackendSession;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+
+import java.awt.*;
 
 import static edu.put.backend.BackendInitScripts.SCRIPTS;
 
@@ -15,8 +16,6 @@ import static edu.put.backend.BackendInitScripts.SCRIPTS;
 public class InitApplication {
 
     public static void main(String[] args) throws BackendException {
-        Logger.getRootLogger().setLevel(Level.INFO);
-        log.info("start");
         var config = new BackendConfig();
         var backendSession = new BackendSession(config.getContactPoint());
         var session = backendSession.getSession();
@@ -24,6 +23,8 @@ public class InitApplication {
         createKeyspace(session, config);
         useKeyspace(session, config.getKeyspace());
         initScripts(session);
+
+        System.exit(0);
     }
 
     private static void useKeyspace(Session session, String keyspace) {
@@ -36,8 +37,10 @@ public class InitApplication {
         for (String script : SCRIPTS) {
             log.info("Running script:\n{}", script);
             try {
-                ResultSet resultSet = session.execute(script);
-                log.info(resultSet.toString());
+                var preparedStatement = session.prepare(script).setConsistencyLevel(ConsistencyLevel.ALL);
+                var boundStatement = new BoundStatement(preparedStatement);
+                var result = session.execute(boundStatement);
+                log.info(result.toString());
             } catch (Exception e) {
                 log.error(e.getMessage());
             }
