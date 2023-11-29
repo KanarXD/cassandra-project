@@ -1,6 +1,7 @@
-package edu.put;
+package edu.put.backend;
 
 
+import edu.put.InitApplication;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -9,17 +10,17 @@ import java.util.Properties;
 
 @Slf4j
 @Getter
-public class CassandraConfig {
+public class BackendConfig {
     private static final String PROPERTIES_FILENAME = "config.properties";
     private final String contactPoint;
     private final String keyspace;
     private final String replicationStrategy;
     private final int replicationFactor;
 
-    public CassandraConfig() {
+    public BackendConfig() {
         Properties properties = new Properties();
         try {
-            properties.load(Main.class.getClassLoader().getResourceAsStream(PROPERTIES_FILENAME));
+            properties.load(InitApplication.class.getClassLoader().getResourceAsStream(PROPERTIES_FILENAME));
             contactPoint = properties.getProperty("contact_point");
             keyspace = properties.getProperty("keyspace");
             replicationStrategy = properties.getProperty("replication_strategy");
