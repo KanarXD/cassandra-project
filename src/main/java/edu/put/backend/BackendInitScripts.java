@@ -13,12 +13,12 @@ public class BackendInitScripts {
                     creation_time TIMESTAMP,
                     user_id INT,
                     food VARCHAR,
-                    order_id UUID,
+                    order_id VARCHAR,
                     PRIMARY KEY (food_category, creation_time)
                     ) WITH CLUSTERING ORDER BY (creation_time DESC);""",
             """
                     CREATE TABLE prepared_orders (
-                    order_id UUID,
+                    order_id VARCHAR,
                     creation_time TIMESTAMP,
                     restaurant_id INT,
                     price INT,
