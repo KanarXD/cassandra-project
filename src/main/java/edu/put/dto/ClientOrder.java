@@ -1,15 +1,16 @@
 package edu.put.dto;
 
 import com.datastax.driver.mapping.annotations.Table;
-import lombok.ToString;
+import lombok.Data;
 
 import java.util.Date;
 
-@ToString
+@Data
 @Table(name = "client_orders")
 public class ClientOrder {
-    Integer client_id;
-    Date creation_time;
-    Integer price;
-    String food;
+    private String food_category;
+    private Date creation_time;
+    private Integer user_id;
+    private String food;
+    private String order_id;
 }
