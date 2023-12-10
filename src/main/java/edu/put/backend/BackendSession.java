@@ -1,6 +1,7 @@
 package edu.put.backend;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,11 @@ public class BackendSession {
         } catch (Exception e) {
             throw new BackendException("Could not connect to the cluster. " + e.getMessage() + ".", e);
         }
+    }
+
+    public ResultSet execute(String query) {
+        log.info("Running query: {}", query);
+        return session.execute(query);
     }
 
     private void setSessionClosing() {

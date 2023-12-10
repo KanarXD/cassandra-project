@@ -8,9 +8,9 @@ import java.util.Date;
 @Data
 @Table(name = "client_orders")
 public class ClientOrder {
-    private String food_category;
-    private Date creation_time;
-    private Integer user_id;
+    private String foodCategory;
+    private Date creationTime;
+    private String orderId;
+    private Integer userId;
     private String food;
-    private String order_id;
 }
