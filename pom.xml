@@ -31,6 +31,11 @@
             <artifactId>cassandra-all</artifactId>
             <version>3.11.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.datastax.cassandra</groupId>
+            <artifactId>cassandra-driver-mapping</artifactId>
+            <version>3.11.0</version>
+        </dependency>
     </dependencies>
 
 </project>

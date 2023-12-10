@@ -13,8 +13,10 @@ public class BackendSession {
     private final Session session;
 
     public BackendSession(String contactPoint) throws BackendException {
-        try (Cluster cluster = Cluster.builder().addContactPoint(contactPoint).build()) {
+        Cluster cluster = Cluster.builder().addContactPoint(contactPoint).build();
+        try {
             session = cluster.connect();
+            setSessionClosing();
         } catch (Exception e) {
             throw new BackendException("Could not connect to the cluster. " + e.getMessage() + ".", e);
         }
@@ -22,11 +24,21 @@ public class BackendSession {
     }
 
     public BackendSession(String contactPoint, String keyspace) throws BackendException {
-        try (Cluster cluster = Cluster.builder().addContactPoint(contactPoint).build()) {
+        Cluster cluster = Cluster.builder().addContactPoint(contactPoint).build();
+        try {
             session = cluster.connect(keyspace);
+            setSessionClosing();
         } catch (Exception e) {
             throw new BackendException("Could not connect to the cluster. " + e.getMessage() + ".", e);
         }
+    }
+
+    private void setSessionClosing() {
+        Thread closeSession = new Thread(() -> {
+            log.info("closing session");
+            session.close();
+        });
+        Runtime.getRuntime().addShutdownHook(closeSession);
     }
 
 }
