@@ -10,11 +10,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Getter
 public class BackendSession {
+    private final Cluster cluster;
 
     private final Session session;
 
     public BackendSession(String contactPoint) throws BackendException {
-        Cluster cluster = Cluster.builder().addContactPoint(contactPoint).build();
+        cluster = Cluster.builder().addContactPoint(contactPoint).build();
         try {
             session = cluster.connect();
             setSessionClosing();
@@ -25,7 +26,7 @@ public class BackendSession {
     }
 
     public BackendSession(String contactPoint, String keyspace) throws BackendException {
-        Cluster cluster = Cluster.builder().addContactPoint(contactPoint).build();
+        cluster = Cluster.builder().addContactPoint(contactPoint).build();
         try {
             session = cluster.connect(keyspace);
             setSessionClosing();
@@ -43,6 +44,7 @@ public class BackendSession {
         Thread closeSession = new Thread(() -> {
             log.info("closing session");
             session.close();
+            cluster.close();
         });
         Runtime.getRuntime().addShutdownHook(closeSession);
     }
