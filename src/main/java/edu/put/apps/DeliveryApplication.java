@@ -1,4 +1,4 @@
-package edu.put;
+package edu.put.apps;
 
 import com.datastax.driver.mapping.MappingManager;
 import edu.put.backend.BackendConfig;

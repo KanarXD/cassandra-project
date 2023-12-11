@@ -1,5 +1,7 @@
 package edu.put;
 
+import edu.put.apps.ClientApplication;
+
 public class AppRunner {
 
     public static void main(String[] args) throws InterruptedException {

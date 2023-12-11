@@ -1,4 +1,4 @@
-package edu.put;
+package edu.put.apps;
 
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.ConsistencyLevel;

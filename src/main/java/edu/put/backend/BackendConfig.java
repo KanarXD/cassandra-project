@@ -1,7 +1,7 @@
 package edu.put.backend;
 
 
-import edu.put.InitApplication;
+import edu.put.apps.InitApplication;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
