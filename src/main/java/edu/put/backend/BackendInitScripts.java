@@ -27,7 +27,7 @@ public class BackendInitScripts {
                     ) WITH CLUSTERING ORDER BY (creationTime DESC);""",
             """
                     CREATE TABLE ready_orders (
-                    id INT,
+                    id VARCHAR,
                     info VARCHAR,
                     PRIMARY KEY (id)
                     );"""

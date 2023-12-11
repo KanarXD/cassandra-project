@@ -9,7 +9,7 @@ import java.util.Date;
 @Table(name = "orders_in_progress")
 public class OrderInProgress {
     private String orderId;
-    private Date creation_time;
+    private Date creationTime;
     private String status;
     private Integer restaurantId;
     private String info;
