@@ -5,7 +5,7 @@ import edu.put.apps.ClientApplication;
 import edu.put.apps.DeliveryApplication;
 import edu.put.apps.RestaurantApplication;
 import edu.put.backend.BackendConfig;
-import edu.put.backend.CassandraSession;
+import edu.put.backend.BackendSession;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -57,9 +57,9 @@ public class AppRunner {
 
     }
 
-    private static CassandraSession getCassandraSession() {
+    private static BackendSession getCassandraSession() {
         var session = cluster.connect(config.getKeyspace());
-        return new CassandraSession(session);
+        return new BackendSession(session);
     }
 
 

@@ -1,11 +1,10 @@
 package edu.put.apps;
 
 import com.datastax.driver.core.BoundStatement;
+import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
 import edu.put.backend.BackendConfig;
-import edu.put.backend.BackendException;
-import edu.put.backend.BackendSession;
 import lombok.extern.slf4j.Slf4j;
 
 import static edu.put.backend.BackendInitScripts.SCRIPTS;
@@ -13,10 +12,10 @@ import static edu.put.backend.BackendInitScripts.SCRIPTS;
 @Slf4j
 public class InitApplication {
 
-    public static void main(String[] args) throws BackendException {
+    public static void main(String[] args) {
         var config = new BackendConfig();
-        var backendSession = new BackendSession(config.getContactPoint());
-        var session = backendSession.getSession();
+        var cluster = Cluster.builder().addContactPoint(config.getContactPoint()).build();
+        var session = cluster.newSession();
 
         createKeyspace(session, config);
         useKeyspace(session, config.getKeyspace());

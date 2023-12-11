@@ -1,7 +1,7 @@
 package edu.put.apps;
 
 import com.datastax.driver.mapping.MappingManager;
-import edu.put.backend.CassandraSession;
+import edu.put.backend.BackendSession;
 import edu.put.dto.ClientOrder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class RestaurantApplication extends Thread {
     private final int restaurantId;
-    private final CassandraSession session;
+    private final BackendSession session;
     private MappingManager mappingManager;
 
     @Override
@@ -25,9 +25,6 @@ public class RestaurantApplication extends Thread {
                 var clientOrder = getClientOrders(foodCategory);
                 log.info("Client order: {}, is: {}", i, clientOrder);
                 deleteClientOrder(clientOrder);
-//                sleep(1000);
-
-//            Thread.sleep(100);
                 insertOrderInProgress(clientOrder);
             }
         } catch (Exception e) {

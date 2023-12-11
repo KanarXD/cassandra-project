@@ -1,7 +1,7 @@
 package edu.put.apps;
 
 import com.datastax.driver.mapping.MappingManager;
-import edu.put.backend.CassandraSession;
+import edu.put.backend.BackendSession;
 import edu.put.dto.OrderInProgress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DeliveryApplication extends Thread {
     private final int deliveryAppId;
-    private final CassandraSession session;
+    private final BackendSession session;
     private MappingManager mappingManager;
 
     @Override

@@ -1,6 +1,6 @@
 package edu.put.apps;
 
-import edu.put.backend.CassandraSession;
+import edu.put.backend.BackendSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -11,19 +11,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ClientApplication extends Thread {
     private final int clientId;
-    private final CassandraSession session;
+    private final BackendSession session;
 
     @Override
     public void run() {
         try {
-//            var config = new BackendConfig();
-//            var backendSession = new BackendSession(config.getContactPoint(), config.getKeyspace());
-//            session = backendSession.getSession();
             for (int i = 0; i < 100; i++) {
                 insertClientOrder();
-//                sleep(1000);
-
-//            Thread.sleep(100);
             }
         } catch (Exception e) {
             log.error("Thread: {}, error: {}", clientId, e.getMessage());
