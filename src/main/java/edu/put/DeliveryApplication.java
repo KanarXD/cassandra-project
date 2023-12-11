@@ -48,10 +48,14 @@ public class DeliveryApplication {
     }
 
     private static OrderInProgress getOrderInProgress() {
-        var query = "SELECT * FROM orders_in_progress LIMIT 1;";
-        var resultSet = backendSession.execute(query);
-        var mapper = mappingManager.mapper(OrderInProgress.class);
-        return mapper.map(resultSet).one();
+        OrderInProgress orderInProgress;
+        do {
+            var query = "SELECT * FROM orders_in_progress LIMIT 1;";
+            var resultSet = backendSession.execute(query);
+            var mapper = mappingManager.mapper(OrderInProgress.class);
+            orderInProgress = mapper.map(resultSet).one();
+        } while (orderInProgress == null);
+        return orderInProgress;
     }
 
 }

@@ -54,9 +54,13 @@ public class RestaurantApplication {
     }
 
     private static ClientOrder getClientOrders(String foodCategory) {
-        var query = String.format("SELECT * FROM client_orders WHERE foodCategory='%s' LIMIT 1;", foodCategory);
-        var resultSet = backendSession.execute(query);
-        var mapper = mappingManager.mapper(ClientOrder.class);
-        return mapper.map(resultSet).one();
+        ClientOrder clientOrder;
+        do {
+            var query = String.format("SELECT * FROM client_orders WHERE foodCategory='%s' LIMIT 1;", foodCategory);
+            var resultSet = backendSession.execute(query);
+            var mapper = mappingManager.mapper(ClientOrder.class);
+            clientOrder = mapper.map(resultSet).one();
+        } while (clientOrder == null);
+        return clientOrder;
     }
 }
