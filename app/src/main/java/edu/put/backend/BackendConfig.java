@@ -10,7 +10,7 @@ import java.util.Properties;
 
 @Slf4j
 @Getter
-public class BackendConfig {
+public final class BackendConfig {
     private static final String PROPERTIES_FILENAME = "config.properties";
     private final String contactPoint;
     private final String keyspace;
