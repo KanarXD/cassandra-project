@@ -1,0 +1,8 @@
+{
+  "contact_point": "127.0.0.1",
+  "keyspace": "test",
+  "replication": {
+    "strategy": "SimpleStrategy",
+    "factor": 3
+  }
+}

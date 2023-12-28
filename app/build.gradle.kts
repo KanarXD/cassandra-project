@@ -1,10 +1,10 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     alias(libs.plugins.jvm)
-
-    // Apply the application plugin to add support for building a CLI application in Java.
+    alias(libs.plugins.lombok.plugin)
+    alias(libs.plugins.lombok)
+    alias(libs.plugins.serialization)
+   // Apply the application plugin to add support for building a CLI application in Java.
     application
 }
 
@@ -26,6 +26,7 @@ dependencies {
     annotationProcessor(libs.lombok)
     // This dependency is used by the application.
     implementation(libs.guava)
+    implementation(libs.serialization.json)
     implementation(libs.cassandra)
     implementation(libs.datastax.cassandra.driver)
     implementation(libs.datastax.cassandra.mapping)
@@ -52,7 +53,7 @@ sourceSets.main {
 
 application {
     // Define the main class for the application.
-    mainClass.set("edu.put.AppRunner")
+    mainClass.set("hector.AppKt")
 }
 
 tasks.named<Test>("test") {

@@ -53,8 +53,8 @@ public class DeliveryApplication extends Thread {
     private OrderInProgress getOrderInProgress() {
         OrderInProgress orderInProgress;
         do {
-            var query = "SELECT * FROM orders_in_progress LIMIT 1;";
-            var resultSet = session.execute(query);
+//            var query = "SELECT * FROM orders_in_progress LIMIT 1;";
+            var resultSet = session.execute("SELECT * FROM orders_in_progress LIMIT 1;");
             var mapper = mappingManager.mapper(OrderInProgress.class);
             orderInProgress = mapper.map(resultSet).one();
         } while (orderInProgress == null);

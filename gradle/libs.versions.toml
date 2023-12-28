@@ -4,6 +4,8 @@
 [versions]
 guava = "32.1.2-jre"
 junit-jupiter-engine = "5.10.0"
+serialization-properties = "1.6.2"
+serialization-json = "1.6.2"
 lombok = "1.18.30"
 apache-cassandra = "4.1.3"
 datastax-cassandra-driver = "3.11.5"
@@ -12,6 +14,8 @@ datastax-cassandra-mapping = "3.11.5"
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter-engine" }
+serialization-properties = { module = "org.jetbrains.kotlinx:kotlinx-serialization-properties", version.ref = "serialization-properties" }
+serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization-json" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 cassandra = { module = "org.apache.cassandra:cassandra-all", version.ref = "apache-cassandra" }
 datastax-cassandra-driver = { module = "com.datastax.cassandra:cassandra-driver-core", version.ref = "datastax-cassandra-driver" }
@@ -19,3 +23,6 @@ datastax-cassandra-mapping = { module = "com.datastax.cassandra:cassandra-driver
 
 [plugins]
 jvm = { id = "org.jetbrains.kotlin.jvm", version = "1.9.20" }
+serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version = "1.9.20" }
+lombok-plugin = { id = "org.jetbrains.kotlin.plugin.lombok", version = "1.9.22" }
+lombok = { id = "io.freefair.lombok", version = "8.1.0" }
