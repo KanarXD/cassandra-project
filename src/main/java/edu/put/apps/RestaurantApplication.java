@@ -21,7 +21,6 @@ public class RestaurantApplication extends Thread {
     @Override
     public void run() {
         try {
-
             mappingManager = new MappingManager(session.getSession());
 
             var foodCategory = Common.foodMap.keySet().stream().toList().get(restaurantId % Common.foodMap.size());

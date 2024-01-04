@@ -63,6 +63,4 @@ public class AppRunner {
         var session = cluster.connect(config.getKeyspace());
         return new BackendSession(session);
     }
-
-
 }
