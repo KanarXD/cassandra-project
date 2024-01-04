@@ -31,7 +31,10 @@ public class DeliveryApplication extends Thread {
                 log.info("add ready order: {}", id);
                 addReadyOrder(orderInProgress, id);
             }
-        } catch (Exception e) {
+        }
+        catch (InterruptedException e) {
+            log.warn("Thread: {} Interrupted, waring: {}", deliveryAppId, e.getMessage());
+        }catch (Exception e) {
             log.error("Thread: {}, error: {}", deliveryAppId, e.getMessage());
         }
 
