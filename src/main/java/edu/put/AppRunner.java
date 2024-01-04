@@ -3,6 +3,7 @@ package edu.put;
 import com.datastax.driver.core.Cluster;
 import edu.put.apps.ClientApplication;
 import edu.put.apps.DeliveryApplication;
+import edu.put.apps.InitApplication;
 import edu.put.apps.RestaurantApplication;
 import edu.put.backend.BackendConfig;
 import edu.put.backend.BackendSession;
@@ -14,12 +15,13 @@ public class AppRunner {
     private static Cluster cluster;
 
     public static void main(String[] args) throws InterruptedException {
+        InitApplication.main(args);
         config = new BackendConfig();
         cluster = Cluster.builder().addContactPoint(config.getContactPoint()).build();
 
-        var clientAppCount = 2;
-        var restaurantAppCount = 2;
-        var deliveryAppCount = 2;
+        var clientAppCount = 3;
+        var restaurantAppCount = 3;
+        var deliveryAppCount = 3;
 
         var clientApps = new ClientApplication[clientAppCount];
         var restaurantApps = new RestaurantApplication[clientAppCount];

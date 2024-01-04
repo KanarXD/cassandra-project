@@ -6,11 +6,15 @@ import edu.put.dto.OrderInProgress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+import java.util.Random;
+
 @Slf4j
 @RequiredArgsConstructor
 public class DeliveryApplication extends Thread {
     private final int deliveryAppId;
     private final BackendSession session;
+    private final Random random = new Random();
     private MappingManager mappingManager;
 
     @Override
@@ -19,6 +23,7 @@ public class DeliveryApplication extends Thread {
             mappingManager = new MappingManager(session.getSession());
 
             for (int i = 0; i < 100; i++) {
+                Thread.sleep(100);
                 var orderInProgress = getOrderInProgress();
                 deleteOrderInProgress(orderInProgress);
 
@@ -50,13 +55,28 @@ public class DeliveryApplication extends Thread {
         session.execute(query);
     }
 
-    private OrderInProgress getOrderInProgress() {
-        OrderInProgress orderInProgress;
+    private OrderInProgress getOrderInProgress() throws InterruptedException {
+        while (true) {
+            var orderInProgress = getTopOrders();
+            OrderInProgress order;
+            if(!orderInProgress.isEmpty()) {
+                order = orderInProgress.get(random.nextInt(orderInProgress.size()));
+            var query = String.format("SELECT * FROM orders_in_progress WHERE orderId = '%s';", order.getOrderId());
+            if (!session.execute(query).all().isEmpty()) {
+                return order;
+            }
+            }
+        }
+    }
+
+    private List<OrderInProgress> getTopOrders() throws InterruptedException {
+        List<OrderInProgress> orderInProgress;
         do {
-            var query = "SELECT * FROM orders_in_progress LIMIT 1;";
+            var query = "SELECT * FROM orders_in_progress LIMIT 10;";
             var resultSet = session.execute(query);
             var mapper = mappingManager.mapper(OrderInProgress.class);
-            orderInProgress = mapper.map(resultSet).one();
+            orderInProgress = mapper.map(resultSet).all();
+            Thread.sleep(5);
         } while (orderInProgress == null);
         return orderInProgress;
     }

@@ -21,7 +21,7 @@ public class InitApplication {
         useKeyspace(session, config.getKeyspace());
         initScripts(session);
 
-        System.exit(0);
+//        System.exit(0);
     }
 
     private static void useKeyspace(Session session, String keyspace) {
