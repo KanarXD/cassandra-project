@@ -20,18 +20,21 @@ public class RestaurantApplication extends Thread {
 
     @Override
     public void run() {
+        var foodCategory = Common.foodMap.keySet().stream().toList().get(restaurantId % Common.foodMap.size());
+
         try {
             mappingManager = new MappingManager(session.getSession());
 
-            var foodCategory = Common.foodMap.keySet().stream().toList().get(restaurantId % Common.foodMap.size());
 
-            for (int i = 0; i < 100; i++) {
+            for (int i = 0; true; i++) {
                 var clientOrder = getClientOrders(foodCategory);
                 log.info("Client order: {}, is: {}", i, clientOrder);
                 deleteClientOrder(clientOrder);
                 insertOrderInProgress(clientOrder);
-                Thread.sleep(100);
+                Thread.sleep(random.nextInt(50));
             }
+        } catch (InterruptedException e) {
+            log.warn("Thread: {}, foodCategory: {}, Interrupted, waring: {}", restaurantId, foodCategory, e.getMessage());
         } catch (Exception e) {
             log.error("Thread: {}, error: {}", restaurantId, e.getMessage());
         }

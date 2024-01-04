@@ -7,6 +7,7 @@ import edu.put.apps.InitApplication;
 import edu.put.apps.RestaurantApplication;
 import edu.put.backend.BackendConfig;
 import edu.put.backend.BackendSession;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -19,9 +20,9 @@ public class AppRunner {
         config = new BackendConfig();
         cluster = Cluster.builder().addContactPoint(config.getContactPoint()).build();
 
-        var clientAppCount = 3;
-        var restaurantAppCount = 3;
-        var deliveryAppCount = 3;
+        var clientAppCount = 5;
+        var restaurantAppCount = 5;
+        var deliveryAppCount = 5;
 
         var clientApps = new ClientApplication[clientAppCount];
         var restaurantApps = new RestaurantApplication[clientAppCount];
@@ -48,6 +49,17 @@ public class AppRunner {
         for (int i = 0; i < clientAppCount; i++) {
             clientApps[i].join();
         }
+        log.warn("Killing threads prepare");
+        Thread.sleep(20000);
+        log.warn("Killing threads");
+
+        for (int i = 0; i < restaurantAppCount; i++) {
+            restaurantApps[i].interrupt();
+        }
+        for (int i = 0; i < deliveryAppCount; i++) {
+            deliveryApps[i].interrupt();
+        }
+
         for (int i = 0; i < restaurantAppCount; i++) {
             restaurantApps[i].join();
         }
@@ -55,8 +67,9 @@ public class AppRunner {
             deliveryApps[i].join();
         }
 
-        System.exit(0);
 
+
+        System.exit(0);
     }
 
     private static BackendSession getCassandraSession() {

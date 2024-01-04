@@ -21,7 +21,7 @@ public class ClientApplication extends Thread {
         try {
             for (int i = 0; i < 100; i++) {
                 insertClientOrder();
-                Thread.sleep(100);
+                Thread.sleep(random.nextInt(50));
             }
         } catch (Exception e) {
             log.error("Thread: {}, error: {}", clientId, e.getMessage());

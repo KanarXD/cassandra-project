@@ -22,8 +22,8 @@ public class DeliveryApplication extends Thread {
         try {
             mappingManager = new MappingManager(session.getSession());
 
-            for (int i = 0; i < 100; i++) {
-                Thread.sleep(100);
+            for (int i = 0; true; i++) {
+                Thread.sleep(random.nextInt(50));
                 var orderInProgress = getOrderInProgress();
                 deleteOrderInProgress(orderInProgress);
 
@@ -76,7 +76,7 @@ public class DeliveryApplication extends Thread {
             var resultSet = session.execute(query);
             var mapper = mappingManager.mapper(OrderInProgress.class);
             orderInProgress = mapper.map(resultSet).all();
-            Thread.sleep(5);
+            Thread.sleep(50);
         } while (orderInProgress == null);
         return orderInProgress;
     }
