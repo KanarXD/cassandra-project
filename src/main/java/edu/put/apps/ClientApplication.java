@@ -33,7 +33,7 @@ public class ClientApplication extends Thread {
         var foodCategory = foodMap.keySet().stream().toList().get(random.nextInt(foodMap.keySet().size()));
         var food = foodMap.get(foodCategory).get(random.nextInt(foodMap.get(foodCategory).size()));
         var query = String.format(
-                "INSERT INTO client_orders (foodCategory, creationTime, userId, food, orderId) VALUES ('%s', '%s', %s, '%s', '%s')",
+                "INSERT INTO client_orders (food_category, creation_time, user_id, food, order_id) VALUES ('%s', '%s', %s, '%s', '%s')",
                 foodCategory,
                 new Date().toInstant(),
                 clientId,

@@ -13,71 +13,67 @@ import java.util.Random;
 @Slf4j
 @RequiredArgsConstructor
 public class RestaurantApplication extends Thread {
-    private final int restaurantId;
+    private final int id;
     private final BackendSession session;
     private final Random random = new Random();
-    private MappingManager mappingManager;
+    private MappingManager mapping;
 
+    @SuppressWarnings("InfiniteLoopStatement")
     @Override
     public void run() {
-        var foodCategory = Common.foodMap.keySet().stream().toList().get(restaurantId % Common.foodMap.size());
+        var category = Common.foodMap.keySet().stream().toList().get(id % Common.foodMap.size());
 
         try {
-            mappingManager = new MappingManager(session.getSession());
-
+            mapping = new MappingManager(session.session());
 
             for (int i = 0; true; i++) {
-                var clientOrder = getClientOrders(foodCategory);
-                log.info("Client order: {}, is: {}", i, clientOrder);
-                deleteClientOrder(clientOrder);
-                insertOrderInProgress(clientOrder);
-                Thread.sleep(random.nextInt(50));
+                var order = get_order(category);
+                delete_client_order(order);
+                create_order(order);
+                log.debug("Restaurant #{} | Client order #{} is: {}", id, i, order);
             }
         } catch (InterruptedException e) {
-            log.warn("Thread: {}, foodCategory: {}, Interrupted, waring: {}", restaurantId, foodCategory, e.getMessage());
+            log.info("Restaurant #{} (category: {}) received interrupt signal. Shutting down.", id, category);
         } catch (Exception e) {
-            log.error("Thread: {}, error: {}", restaurantId, e.getMessage());
+            log.error("Restaurant #{} failed. Error: {}", id, e.getMessage());
         }
     }
 
-    private void deleteClientOrder(ClientOrder clientOrder) {
-        var query = String.format(
-                "DELETE FROM client_orders WHERE foodCategory='%s' AND creationTime='%s' AND orderId='%s'",
-                clientOrder.getFoodCategory(),
-                clientOrder.getCreationTime().toInstant(),
-                clientOrder.getOrderId()
-        );
-        session.execute(query);
+    private void delete_client_order(ClientOrder order) {
+        session.execute(String.format("DELETE FROM client_orders WHERE food_category='%s' AND creation_time='%s' AND order_id='%s'", order.getCategory(), order.getCreationTime().toInstant(), order.getOrderId()));
     }
 
-    private void insertOrderInProgress(ClientOrder clientOrder) {
-        var query = String.format(
-                "INSERT INTO orders_in_progress (orderId, creationTime, status, restaurantId, info) VALUES ('%s', '%s', '%s', %s, '%s')",
-                clientOrder.getOrderId(),
-                clientOrder.getCreationTime().toInstant(),
-                "READY",
-                restaurantId,
-                clientOrder
-        );
-        session.execute(query);
+    private void create_order(ClientOrder order) {
+        session.execute(String.format("INSERT INTO orders_in_progress (order_id, creation_time, status, restaurant_id, info) VALUES ('%s', '%s', '%s', %s, '%s')", order.getOrderId(), order.getCreationTime().toInstant(), "READY", id, order));
     }
 
-    private ClientOrder getClientOrders(String foodCategory) throws InterruptedException {
-        var mapper = mappingManager.mapper(ClientOrder.class);
-        List<ClientOrder> clientOrders;
-        do {
-            var query = String.format("SELECT * FROM client_orders WHERE foodCategory='%s' LIMIT 10;", foodCategory);
-            var resultSet = session.execute(query);
-            clientOrders = mapper.map(resultSet).all();
-            Thread.sleep(5);
-        } while (clientOrders == null || clientOrders.isEmpty());
-        ClientOrder clientOrder = clientOrders.get(random.nextInt(clientOrders.size()));
-        var query = String.format("SELECT * FROM client_orders WHERE foodCategory='%s' AND creationTime='%s' AND orderId='%s';",
-                foodCategory, clientOrder.getCreationTime().toInstant(), clientOrder.getOrderId());
-        var resultSet = session.execute(query);
-        if (mapper.map(resultSet).one() == null) {
-            return getClientOrders(foodCategory);
+    private ClientOrder get_order(String category) throws InterruptedException {
+        var mapper = mapping.mapper(ClientOrder.class);
+
+        while (true) {
+            var orders = get_top_orders(category, 10);
+            var order = orders.get(random.nextInt(orders.size()));
+            var results = session.execute(String.format("SELECT * FROM client_orders WHERE food_category='%s' AND creation_time='%s' AND order_id='%s';", category, order.getCreationTime().toInstant(), order.getOrderId()));
+            if (!mapper.map(results).all().isEmpty()) {
+                return order;
+            }
         }
-        return clientOrder;
+    }
+
+    @SuppressWarnings({"SameParameterValue"})
+    private List<ClientOrder> get_top_orders(String category, int limit) throws InterruptedException {
+        var mapper = mapping.mapper(ClientOrder.class);
+        List<ClientOrder> orders = List.of();
+        while (orders.isEmpty()) {
+            var results = session.execute(String.format("SELECT * FROM client_orders WHERE food_category='%s' LIMIT %d;", category, limit));
+            orders = mapper.map(results).all();
+
+            if (orders.isEmpty() && Thread.currentThread().isInterrupted()) {
+                // Thread was interrupted, so no new orders are coming and we should finish.
+                throw new InterruptedException();
+            }
+        }
+
+        return orders;
     }
 }

@@ -12,76 +12,63 @@ import java.util.Random;
 @Slf4j
 @RequiredArgsConstructor
 public class DeliveryApplication extends Thread {
-    private final int deliveryAppId;
+    private final int id;
     private final BackendSession session;
     private final Random random = new Random();
-    private MappingManager mappingManager;
+    private MappingManager mapping;
 
+    @SuppressWarnings("InfiniteLoopStatement")
     @Override
     public void run() {
         try {
-            mappingManager = new MappingManager(session.getSession());
+            mapping = new MappingManager(session.session());
 
             for (int i = 0; true; i++) {
-                Thread.sleep(random.nextInt(50));
-                var orderInProgress = getOrderInProgress();
-                deleteOrderInProgress(orderInProgress);
-
-                String id = deliveryAppId + ":" + i;
-                log.info("add ready order: {}", id);
-                addReadyOrder(orderInProgress, id);
+                var order = get_order();
+                delete_order(order);
+                create_delivered_order(order, String.format("%d:%d", id, i));
+                log.debug("Delivery Courier #{} | Client order #{} is: {}", id, i, order);
             }
+        } catch (InterruptedException e) {
+            log.info("Delivery Courier #{} received interrupt signal. Shutting down.", id);
+        } catch (Exception e) {
+            log.error("Delivery Courier #{} failed. Error: {}", id, e.getMessage());
         }
-        catch (InterruptedException e) {
-            log.warn("Thread: {} Interrupted, waring: {}", deliveryAppId, e.getMessage());
-        }catch (Exception e) {
-            log.error("Thread: {}, error: {}", deliveryAppId, e.getMessage());
-        }
-
     }
 
-    private void addReadyOrder(OrderInProgress orderInProgress, String id) {
-        var query = String.format(
-                "INSERT INTO ready_orders (id, info) VALUES ('%s', '%s')",
-                id,
-                orderInProgress
-        );
-        session.execute(query);
+    private void create_delivered_order(OrderInProgress order, String id) {
+        session.execute(String.format("INSERT INTO ready_orders (id, info) VALUES ('%s', '%s')", id, order));
     }
 
-    private void deleteOrderInProgress(OrderInProgress orderInProgress) {
-        var query = String.format(
-                "DELETE FROM orders_in_progress WHERE orderId='%s' AND creationTime='%s'",
-                orderInProgress.getOrderId(),
-                orderInProgress.getCreationTime().toInstant()
-        );
-        session.execute(query);
+    private void delete_order(OrderInProgress orderInProgress) {
+        session.execute(String.format("DELETE FROM orders_in_progress WHERE order_id='%s' AND creation_time='%s'", orderInProgress.getOrderId(), orderInProgress.getCreationTime().toInstant()));
     }
 
-    private OrderInProgress getOrderInProgress() throws InterruptedException {
+    private OrderInProgress get_order() throws InterruptedException {
         while (true) {
-            var orderInProgress = getTopOrders();
-            OrderInProgress order;
-            if(!orderInProgress.isEmpty()) {
-                order = orderInProgress.get(random.nextInt(orderInProgress.size()));
-            var query = String.format("SELECT * FROM orders_in_progress WHERE orderId = '%s';", order.getOrderId());
+            var orders = get_top_orders(10);
+            var order = orders.get(random.nextInt(orders.size()));
+            var query = String.format("SELECT * FROM orders_in_progress WHERE order_id = '%s';", order.getOrderId());
             if (!session.execute(query).all().isEmpty()) {
                 return order;
             }
-            }
         }
     }
 
-    private List<OrderInProgress> getTopOrders() throws InterruptedException {
-        List<OrderInProgress> orderInProgress;
-        do {
-            var query = "SELECT * FROM orders_in_progress LIMIT 10;";
-            var resultSet = session.execute(query);
-            var mapper = mappingManager.mapper(OrderInProgress.class);
-            orderInProgress = mapper.map(resultSet).all();
-            Thread.sleep(50);
-        } while (orderInProgress == null);
-        return orderInProgress;
-    }
+    @SuppressWarnings({"SameParameterValue"})
+    private List<OrderInProgress> get_top_orders(int limit) throws InterruptedException {
+        var mapper = mapping.mapper(OrderInProgress.class);
+        List<OrderInProgress> orders = List.of();
 
+        while (orders.isEmpty()) {
+            var results = session.execute(String.format("SELECT * FROM orders_in_progress LIMIT %d;", limit));
+            orders = mapper.map(results).all();
+
+            if (orders.isEmpty() && Thread.currentThread().isInterrupted()) {
+                // Thread was interrupted, so no new orders are coming and we should finish.
+                throw new InterruptedException();
+            }
+        }
+        return orders;
+    }
 }
