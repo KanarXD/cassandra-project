@@ -36,6 +36,11 @@
             <artifactId>cassandra-driver-mapping</artifactId>
             <version>3.11.0</version>
         </dependency>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>4.7.0</version>
+        </dependency>
     </dependencies>
 
 </project>
