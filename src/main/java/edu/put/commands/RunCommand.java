@@ -4,19 +4,23 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.mapping.MappingManager;
-import edu.put.apps.ClientApplication;
-import edu.put.apps.DeliveryApplication;
-import edu.put.apps.RestaurantApplication;
-import edu.put.backend.BackendSession;
-import edu.put.dto.ReadyOrder;
-import edu.put.records.Config;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.util.HashSet;
+import edu.put.Main;
+import edu.put.apps.ClientApplication;
+import edu.put.apps.DeliveryApplication;
+import edu.put.apps.RestaurantApplication;
+import edu.put.backend.BackendSession;
+import edu.put.dto.ClientOrder;
+import edu.put.dto.OrderInProgress;
+import edu.put.dto.ReadyOrder;
+import edu.put.records.Config;
+import edu.put.records.Replication;
 
-import static org.slf4j.Logger.ROOT_LOGGER_NAME;
+import java.util.HashSet;
+import java.util.List;
 
 @Slf4j
 @CommandLine.Command(name = "run")
@@ -125,7 +129,25 @@ public class RunCommand implements Runnable {
             default -> Level.ALL;
         };
 
-        Logger logger = (Logger) LoggerFactory.getLogger(ROOT_LOGGER_NAME);
-        logger.setLevel(level);
+
+        var loggers = List.of(
+                ClientApplication.class,
+                DeliveryApplication.class,
+                RestaurantApplication.class,
+                BackendSession.class,
+                InitCommand.class,
+                RunCommand.class,
+                ClientOrder.class,
+                OrderInProgress.class,
+                ReadyOrder.class,
+                Config.class,
+                Replication.class,
+                Main.class
+        );
+
+        for(var clazz : loggers) {
+            Logger logger = (Logger) LoggerFactory.getLogger(clazz);
+            logger.setLevel(level);
+        }
     }
 }
