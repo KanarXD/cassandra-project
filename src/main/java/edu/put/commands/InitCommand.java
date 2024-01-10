@@ -45,6 +45,7 @@ public class InitCommand implements Runnable {
             // Cleanup tables.
             log.trace("Cleaning up tables.");
             session.execute("DROP TABLE IF EXISTS client_orders;");
+            session.execute("DROP TABLE IF EXISTS order_confirmation");
             session.execute("DROP TABLE IF EXISTS orders_in_progress;");
             session.execute("DROP TABLE IF EXISTS ready_orders;");
 
@@ -63,13 +64,22 @@ public class InitCommand implements Runnable {
                     """);
 
             session.execute("""
-                    CREATE TABLE orders_in_progress (
+                    CREATE TABLE order_confirmation (
                         order_id VARCHAR,
-                        creation_time TIMESTAMP,
-                        status VARCHAR,
                         restaurant_id INT,
                         info VARCHAR,
-                        PRIMARY KEY (order_id, creation_time)
+                        PRIMARY KEY (order_id, restaurant_id)
+                    )
+                    WITH CLUSTERING ORDER BY (restaurant_id ASC);
+                    """);
+
+            session.execute("""
+                    CREATE TABLE orders_in_progress (
+                        restaurant_id INT,
+                        creation_time TIMESTAMP,
+                        order_id VARCHAR,
+                        info VARCHAR,
+                        PRIMARY KEY (restaurant_id, creation_time)
                     )
                     WITH CLUSTERING ORDER BY (creation_time DESC);
                     """);
