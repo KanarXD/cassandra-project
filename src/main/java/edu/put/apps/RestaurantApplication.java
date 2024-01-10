@@ -4,9 +4,11 @@ import com.datastax.driver.mapping.MappingManager;
 import edu.put.backend.BackendSession;
 import edu.put.backend.Common;
 import edu.put.dto.ClientOrder;
+import edu.put.dto.OrderInProgress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
@@ -15,6 +17,7 @@ import java.util.Random;
 public class RestaurantApplication extends Thread {
     private final int id;
     private final BackendSession session;
+    private Date lastInProgress = new Date();
     private final Random random = new Random();
     private MappingManager mapping;
 
@@ -29,7 +32,9 @@ public class RestaurantApplication extends Thread {
             for (int i = 0; true; i++) {
                 var order = get_order(category);
                 delete_client_order(order);
-                create_order(order);
+                create_order_confirmation(order);
+                add_ready_orders();
+
                 log.debug("Restaurant #{} | Client order #{} is: {}", id, i, order);
             }
         } catch (InterruptedException e) {
@@ -39,12 +44,31 @@ public class RestaurantApplication extends Thread {
         }
     }
 
+    private void add_ready_orders() {
+        var mapper = mapping.mapper(OrderInProgress.class);
+        var query = String.format("SELECT * FROM orders_in_progress WHERE restaurant_id='%s' AND timestamp > '%s'", id, lastInProgress.toInstant());
+        var results = session.execute(query);
+        var inProgresses = mapper.map(results).all();
+        for (var inProgress : inProgresses) {
+            var timestamp = inProgress.getCreationTime();
+            if (timestamp.after(lastInProgress)) {
+                lastInProgress = timestamp;
+            }
+            create_ready_order(null);
+        }
+    }
+
+    private void create_order_confirmation(ClientOrder order) {
+        var query = String.format("INSERT INTO order_confirmation (order_id VARCHAR, restaurant_id, info) VALUES ('%s', '%s', '%s');", order.getOrderId(), id, order);
+        session.execute(query);
+    }
+
     private void delete_client_order(ClientOrder order) {
         session.execute(String.format("DELETE FROM client_orders WHERE food_category='%s' AND creation_time='%s' AND order_id='%s'", order.getCategory(), order.getCreationTime().toInstant(), order.getOrderId()));
     }
 
-    private void create_order(ClientOrder order) {
-        session.execute(String.format("INSERT INTO orders_in_progress (order_id, creation_time, status, restaurant_id, info) VALUES ('%s', '%s', '%s', %s, '%s')", order.getOrderId(), order.getCreationTime().toInstant(), "READY", id, order));
+    private void create_ready_order(ClientOrder order) {
+//        session.execute(String.format("INSERT INTO orders_in_progress (order_id, creation_time, status, restaurant_id, info) VALUES ('%s', '%s', '%s', %s, '%s')", order.getOrderId(), order.getCreationTime().toInstant(), "READY", id, order));
     }
 
     private ClientOrder get_order(String category) throws InterruptedException {

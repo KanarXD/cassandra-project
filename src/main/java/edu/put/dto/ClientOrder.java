@@ -2,11 +2,13 @@ package edu.put.dto;
 
 import com.datastax.driver.mapping.annotations.Column;
 import com.datastax.driver.mapping.annotations.Table;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import java.util.Date;
 
 @Data
+@AllArgsConstructor
 @Table(name = "client_orders")
 public class ClientOrder {
     @Column(name = "food_category")

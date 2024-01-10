@@ -87,6 +87,7 @@ public class InitCommand implements Runnable {
             session.execute("""
                     CREATE TABLE ready_orders (
                         id VARCHAR,
+                        creation_time TIMESTAMP,
                         info VARCHAR,
                         PRIMARY KEY (id)
                     );
