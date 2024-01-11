@@ -6,6 +6,7 @@ import edu.put.backend.Common;
 import edu.put.dto.ClientOrder;
 import edu.put.dto.OrderInProgress;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Date;
@@ -21,6 +22,7 @@ public class RestaurantApplication extends Thread {
     private final Random random = new Random();
     private MappingManager mapping;
 
+    @SneakyThrows
     @SuppressWarnings("InfiniteLoopStatement")
     @Override
     public void run() {
@@ -37,29 +39,47 @@ public class RestaurantApplication extends Thread {
 
                 log.debug("Restaurant #{} | Client order #{} is: {}", id, i, order);
             }
+
         } catch (InterruptedException e) {
+            while (add_ready_orders()) {
+                log.debug("No more client orders, waiting for confirmations");
+            }
             log.info("Restaurant #{} (category: {}) received interrupt signal. Shutting down.", id, category);
         } catch (Exception e) {
             log.error("Restaurant #{} failed. Error: {}", id, e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    private void add_ready_orders() {
+    private boolean add_ready_orders() {
         var mapper = mapping.mapper(OrderInProgress.class);
-        var query = String.format("SELECT * FROM orders_in_progress WHERE restaurant_id='%s' AND timestamp > '%s'", id, lastInProgress.toInstant());
+        var query = String.format("SELECT * FROM orders_in_progress WHERE restaurant_id=%d AND creation_time > '%s'", id, lastInProgress.toInstant());
         var results = session.execute(query);
+        if (results == null) {
+            log.debug("Nothing in orders_in_progress for restaurant: {}", id);
+            return false;
+        }
         var inProgresses = mapper.map(results).all();
+        if (inProgresses.isEmpty()) {
+            return false;
+        }
         for (var inProgress : inProgresses) {
             var timestamp = inProgress.getCreationTime();
             if (timestamp.after(lastInProgress)) {
                 lastInProgress = timestamp;
             }
-            create_ready_order(null);
+            create_ready_order(inProgress.getOrderId(), inProgress.getInfo());
         }
+        return true;
+    }
+
+    private void create_ready_order(String orderId, String info) {
+        var readyOrderId = id + ":" + orderId;
+        session.execute(String.format("INSERT INTO ready_orders (id, creation_time, info) VALUES ('%s', '%s', '%s')", readyOrderId, new Date().toInstant(), info));
     }
 
     private void create_order_confirmation(ClientOrder order) {
-        var query = String.format("INSERT INTO order_confirmation (order_id VARCHAR, restaurant_id, info) VALUES ('%s', '%s', '%s');", order.getOrderId(), id, order);
+        var query = String.format("INSERT INTO order_confirmation (order_id, restaurant_id, info) VALUES ('%s', %d, '%s');", order.getOrderId(), id, order);
         session.execute(query);
     }
 
@@ -67,9 +87,6 @@ public class RestaurantApplication extends Thread {
         session.execute(String.format("DELETE FROM client_orders WHERE food_category='%s' AND creation_time='%s' AND order_id='%s'", order.getCategory(), order.getCreationTime().toInstant(), order.getOrderId()));
     }
 
-    private void create_ready_order(ClientOrder order) {
-//        session.execute(String.format("INSERT INTO orders_in_progress (order_id, creation_time, status, restaurant_id, info) VALUES ('%s', '%s', '%s', %s, '%s')", order.getOrderId(), order.getCreationTime().toInstant(), "READY", id, order));
-    }
 
     private ClientOrder get_order(String category) throws InterruptedException {
         var mapper = mapping.mapper(ClientOrder.class);

@@ -13,7 +13,6 @@ public class OrderInProgress {
     private String orderId;
     @Column(name = "creation_time")
     private Date creationTime;
-    private String status;
     @Column(name = "restaurant_id")
     private Integer restaurantId;
     private String info;

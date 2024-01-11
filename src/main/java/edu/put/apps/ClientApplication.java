@@ -15,9 +15,10 @@ import java.util.*;
 public class ClientApplication extends Thread {
     private final int clientId;
     private final BackendSession session;
-    private final List<ClientOrder> orders;
     private final MappingManager manager;
-    private final Random random = new Random();
+    private List<ClientOrder> orders = new ArrayList<>();
+    private List<ClientOrder> confirmed_orders = new ArrayList<>();
+    private Random random = new Random();
 
     @Override
     public void run() {
@@ -27,6 +28,13 @@ public class ClientApplication extends Thread {
                 confirm_orders();
                 Thread.sleep(random.nextInt(50));
             }
+
+            while (!orders.isEmpty()) {
+                log.debug("Client is only confirming");
+                confirm_orders();
+            }
+
+            log.warn("Confirmed {} orders", confirmed_orders.size());
         } catch (Exception e) {
             log.error("Thread: {}, error: {}", clientId, e.getMessage());
         }
@@ -41,7 +49,7 @@ public class ClientApplication extends Thread {
         var query = String.format("INSERT INTO client_orders (food_category, creation_time, user_id, food, order_id) VALUES ('%s', '%s', %s, '%s', '%s')", order.getCategory(), order.getCreationTime().toInstant(), order.getUserId(), order.getFood(), order.getOrderId());
 
         orders.add(order);
-        log.info("Running query: {}", query);
+        log.trace("Running query: {}", query);
         session.execute(query);
     }
 
@@ -55,12 +63,14 @@ public class ClientApplication extends Thread {
             var confirmations = mapper.map(results).all().stream().map(Confirmation::getRestaurantId).toList();
             if (!confirmations.isEmpty()) {
                 to_remove.add(order);
+                confirmed_orders.add(order);
                 var index = random.nextInt(confirmations.size());
                 var restaurant = confirmations.get(index);
-                session.execute(String.format("INSERT INTO orders_in_progress VALUES ('%s', '%s', '%s', '%s')", restaurant, new Date().toInstant(), order.getOrderId(), order));
+                session.execute(String.format("INSERT INTO orders_in_progress(restaurant_id, creation_time, order_id, info) VALUES (%d, '%s', '%s', '%s')", restaurant, new Date().toInstant(), order.getOrderId(), order));
             }
         }
 
         orders.removeIf(to_remove::contains);
+        to_remove.clear();
     }
 }

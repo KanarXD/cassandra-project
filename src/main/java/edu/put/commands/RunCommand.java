@@ -60,6 +60,7 @@ public class RunCommand implements Runnable {
         try (var cluster = Cluster.builder().addContactPoint(config.contact_point()).build()) {
             log.info("Initializing session.");
             var session = new BackendSession(cluster.connect(config.keyspace()));
+            var manager = new MappingManager(session.session());
 
             var client_apps = new ClientApplication[clients];
             var restaurant_apps = new RestaurantApplication[restaurants];
@@ -67,7 +68,7 @@ public class RunCommand implements Runnable {
 
             log.info("Starting client applications.");
             for (int id = 0; id < clients; id++) {
-                var app = new ClientApplication(id, session);
+                var app = new ClientApplication(id, session, manager);
                 app.start();
                 client_apps[id] = app;
             }
@@ -79,18 +80,20 @@ public class RunCommand implements Runnable {
                 restaurant_apps[id] = app;
             }
 
-            log.info("Starting delivery applications.");
-            for (int id = 0; id < deliveries; id++) {
-                var app = new DeliveryApplication(id, session);
-                app.start();
-                delivery_apps[id] = app;
-            }
+//            log.info("Starting delivery applications.");
+//            for (int id = 0; id < deliveries; id++) {
+//                var app = new DeliveryApplication(id, session);
+//                app.start();
+//                delivery_apps[id] = app;
+//            }
 
             log.info("Waiting for clients to finish.");
             for (int i = 0; i < clients; i++) {
                 client_apps[i].join();
             }
             log.info("Clients finished.");
+
+            Thread.sleep(20000);
 
             log.debug("Sending finish signal to restaurants.");
 
@@ -103,13 +106,13 @@ public class RunCommand implements Runnable {
             }
             log.info("Restaurants finished.");
 
-            for (int i = 0; i < deliveries; i++) {
-                delivery_apps[i].interrupt();
-            }
-
-            for (int i = 0; i < deliveries; i++) {
-                delivery_apps[i].join();
-            }
+//            for (int i = 0; i < deliveries; i++) {
+//                delivery_apps[i].interrupt();
+//            }
+//
+//            for (int i = 0; i < deliveries; i++) {
+//                delivery_apps[i].join();
+//            }
             log.info("Deliveries finished.");
 
             show_stats(session);

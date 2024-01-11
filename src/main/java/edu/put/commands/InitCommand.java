@@ -79,7 +79,7 @@ public class InitCommand implements Runnable {
                         creation_time TIMESTAMP,
                         order_id VARCHAR,
                         info VARCHAR,
-                        PRIMARY KEY (restaurant_id, creation_time)
+                        PRIMARY KEY (restaurant_id, creation_time, order_id)
                     )
                     WITH CLUSTERING ORDER BY (creation_time DESC);
                     """);
