@@ -93,7 +93,7 @@ public class RunCommand implements Runnable {
             }
             log.info("Clients finished.");
 
-            Thread.sleep(20000);
+//            Thread.sleep(20000);
 
             log.debug("Sending finish signal to restaurants.");
 

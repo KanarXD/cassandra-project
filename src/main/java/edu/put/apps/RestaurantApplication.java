@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigInteger;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
@@ -41,8 +43,14 @@ public class RestaurantApplication extends Thread {
             }
 
         } catch (InterruptedException e) {
+            Thread.interrupted();
+            var count = getOrdersInProgressCount();
             while (add_ready_orders()) {
                 log.debug("No more client orders, waiting for confirmations");
+                Thread.sleep(5000);
+                if (count == getOrdersInProgressCount()) {
+                    break;
+                }
             }
             log.info("Restaurant #{} (category: {}) received interrupt signal. Shutting down.", id, category);
         } catch (Exception e) {
@@ -51,9 +59,19 @@ public class RestaurantApplication extends Thread {
         }
     }
 
+    private long getOrdersInProgressCount() {
+        var query = String.format("SELECT COUNT(*) FROM orders_in_progress WHERE restaurant_id=%d ", id);
+        var results = session.execute(query);
+        return results.one().getLong("count");
+    }
+
     private boolean add_ready_orders() {
         var mapper = mapping.mapper(OrderInProgress.class);
-        var query = String.format("SELECT * FROM orders_in_progress WHERE restaurant_id=%d AND creation_time > '%s'", id, lastInProgress.toInstant());
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(lastInProgress);
+        calendar.add(Calendar.SECOND, -5);
+
+        var query = String.format("SELECT * FROM orders_in_progress WHERE restaurant_id=%d AND creation_time > '%s'", id, calendar.toInstant());
         var results = session.execute(query);
         if (results == null) {
             log.debug("Nothing in orders_in_progress for restaurant: {}", id);
