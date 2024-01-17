@@ -1,16 +1,15 @@
 package edu.put.backend;
 
-import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.Session;
-import com.datastax.driver.core.exceptions.NoHostAvailableException;
-import com.datastax.driver.core.exceptions.QueryValidationException;
-import com.datastax.driver.core.exceptions.UnavailableException;
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.servererrors.QueryValidationException;
+import com.datastax.oss.driver.api.core.servererrors.UnavailableException;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 //@Getter
-public record BackendSession(Session session) {
-    public BackendSession(Session session) {
+public record BackendSession(CqlSession session) {
+    public BackendSession(CqlSession session) {
         this.session = session;
         configure_session_cleanup();
     }
@@ -25,14 +24,16 @@ public record BackendSession(Session session) {
                             
                     Invalid query: `{}`
                     Error: {}""", query, error.getMessage());
-        } catch (NoHostAvailableException error) {
-            log.error("""
-                                        
-                    Cannot perform query: `{}`.
-                    No cassandra hosts are available right now.
-                    Error: {}
-                    """, query, error.getMessage());
-        } catch (UnavailableException error) {
+        }
+//        catch (NoHostAvailableException error) {
+//            log.error("""
+//
+//                    Cannot perform query: `{}`.
+//                    No cassandra hosts are available right now.
+//                    Error: {}
+//                    """, query, error.getMessage());
+//        }
+        catch (UnavailableException error) {
             log.warn("""
                                         
                     Cannot perform query `{}`.

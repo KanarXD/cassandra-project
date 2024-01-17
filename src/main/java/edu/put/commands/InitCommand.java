@@ -2,8 +2,8 @@ package edu.put.commands;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
-import com.datastax.driver.core.Cluster;
-import edu.put.records.Config;
+import com.datastax.oss.driver.api.core.CqlSession;
+import edu.put.database.config.Config;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -15,8 +15,11 @@ public class InitCommand implements Runnable {
     private String keyspace;
     @CommandLine.Option(names = {"-s", "--replication-strategy"})
     private String replication_strategy;
+    // Fucking important! Type of replication_factor MUST BE `Integer`, not `int`
+    // because uninitialized `int` defaults to 0, overrides value from config file
+    // and crashes database 'cause there are no replicas.
     @CommandLine.Option(names = {"-f", "--replication-factor"})
-    private int replication_factor;
+    private Integer replication_factor;
     @CommandLine.Option(names = "--contact-point")
     private String contact_point;
 
@@ -29,71 +32,91 @@ public class InitCommand implements Runnable {
 
         log.info("Configuring database.");
         var config = Config.load("config.properties").modify(contact_point, keyspace, replication_strategy, replication_factor);
-
-        try (var cluster = Cluster.builder().addContactPoint(config.contact_point()).build()) {
-            var session = cluster.newSession();
-
+        log.info("Loaded configuration: {}", config);
+        try (var session = CqlSession.builder().build()) {
             // Create keyspace in database.
+            log.trace("Cleaning up keyspace.");
+            session.execute(String.format("DROP KEYSPACE IF EXISTS %s;", config.keyspace()));
             log.trace("Creating keyspace `{}`", config.keyspace());
             session.execute(String.format("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': '%s', 'replication_factor': %d };", config.keyspace(), config.replication().strategy(), config.replication().factor()));
             log.trace("Keyspace `{}` created.", config.keyspace());
+        } catch (Exception error) {
+            log.error("Error occurred when creating keyspace: {}", error.getMessage());
+        }
 
-            // Enter keyspace.
-            log.trace("Entering keyspace `{}`", config.keyspace());
-            session.execute(String.format("USE %s;", config.keyspace()));
-
+        try (var session = CqlSession.builder().withKeyspace(config.keyspace()).build()) {
             // Cleanup tables.
-            log.trace("Cleaning up tables.");
-            session.execute("DROP TABLE IF EXISTS client_orders;");
-            session.execute("DROP TABLE IF EXISTS order_confirmation");
-            session.execute("DROP TABLE IF EXISTS orders_in_progress;");
-            session.execute("DROP TABLE IF EXISTS ready_orders;");
+            log.trace("Cleaning up.");
+            session.execute("DROP TABLE IF EXISTS restaurants;");
+            session.execute("DROP TABLE IF EXISTS orders;");
+            session.execute("DROP TABLE IF EXISTS ready;");
+            session.execute("DROP TABLE IF EXISTS delivery_confirmation;");
+            session.execute("DROP TABLE IF EXISTS delivery;");
+            session.execute("DROP TYPE IF EXISTS CLIENT_ORDER;");
+
+            log.trace("Defining custom types.");
+            session.execute("""
+                    CREATE TYPE IF NOT EXISTS CLIENT_ORDER (
+                        id VARCHAR,
+                        category VARCHAR,
+                        variant VARCHAR,
+                        client INT
+                    );
+                    """);
 
             // Create required tables.
             log.trace("Recreating tables.");
             session.execute("""
-                    CREATE TABLE client_orders (
-                        food_category VARCHAR,
-                        creation_time TIMESTAMP,
-                        order_id VARCHAR,
-                        user_id INT,
-                        food VARCHAR,
-                        PRIMARY KEY (food_category, creation_time, order_id)
-                    )
-                    WITH CLUSTERING ORDER BY (creation_time DESC);
-                    """);
-
-            session.execute("""
-                    CREATE TABLE order_confirmation (
-                        order_id VARCHAR,
+                    CREATE TABLE restaurants (
+                        category VARCHAR,
                         restaurant_id INT,
-                        info VARCHAR,
-                        PRIMARY KEY (order_id, restaurant_id)
-                    )
-                    WITH CLUSTERING ORDER BY (restaurant_id ASC);
+                        PRIMARY KEY (category, restaurant_id)
+                    );
                     """);
-
             session.execute("""
-                    CREATE TABLE orders_in_progress (
+                    CREATE TABLE orders (
                         restaurant_id INT,
-                        creation_time TIMESTAMP,
+                        timestamp TIMESTAMP,
                         order_id VARCHAR,
-                        info VARCHAR,
-                        PRIMARY KEY (restaurant_id, creation_time, order_id)
+                        details CLIENT_ORDER,
+                        PRIMARY KEY (restaurant_id, timestamp)
                     )
-                    WITH CLUSTERING ORDER BY (creation_time DESC);
+                    WITH CLUSTERING ORDER BY (timestamp DESC);
                     """);
 
             session.execute("""
-                    CREATE TABLE ready_orders (
-                        id VARCHAR,
-                        creation_time TIMESTAMP,
-                        info VARCHAR,
-                        PRIMARY KEY (id)
+                    CREATE TABLE ready (
+                        date VARCHAR,
+                        timestamp TIMESTAMP,
+                        order_id VARCHAR,
+                        details CLIENT_ORDER,
+                        PRIMARY KEY (date, timestamp)
+                    )
+                    WITH CLUSTERING ORDER BY (timestamp ASC);
+                    """);
+
+            session.execute("""
+                    CREATE TABLE delivery_confirmation (
+                        order_id VARCHAR,
+                        delivery_id INT,
+                        details CLIENT_ORDER,
+                        PRIMARY KEY (order_id, delivery_id)
+                    )
+                    WITH CLUSTERING ORDER BY (delivery_id ASC);
+                    """);
+
+            session.execute("""
+                    CREATE TABLE delivery (
+                        delivery_id INT,
+                        order_id VARCHAR,
+                        details CLIENT_ORDER,
+                        PRIMARY KEY (delivery_id, order_id)
                     );
                     """);
 
             log.info("Database configured.");
+        } catch (Exception error) {
+            log.error("Error encountered when setting up database: {}", error.getMessage());
         }
     }
 

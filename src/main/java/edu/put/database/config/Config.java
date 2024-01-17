@@ -1,4 +1,4 @@
-package edu.put.records;
+package edu.put.database.config;
 
 import java.io.IOException;
 import java.util.Properties;
