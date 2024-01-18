@@ -3,7 +3,6 @@ package edu.put.commands;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.put.database.config.Config;
 import edu.put.database.config.Driver;
 import edu.put.database.config.Replication;
@@ -90,14 +89,14 @@ public class InitCommand implements Runnable {
                     WITH CLUSTERING ORDER BY (timestamp DESC, order_id ASC);
                     """);
 
-//            session.execute("""
-//                    CREATE TABLE confirmed (
-//                        order_id VARCHAR,
-//                        restaurant_id INT,
-//                        PRIMARY KEY (order_id, restaurant_id)
-//                    )
-//                    WITH CLUSTERING ORDER BY (restaurant_id ASC);
-//                    """);
+            session.execute("""
+                    CREATE TABLE confirmed (
+                        order_id VARCHAR,
+                        restaurant_id INT,
+                        PRIMARY KEY (order_id, restaurant_id)
+                    )
+                    WITH CLUSTERING ORDER BY (restaurant_id ASC);
+                    """);
 
             session.execute("""
                     CREATE TABLE ready (
