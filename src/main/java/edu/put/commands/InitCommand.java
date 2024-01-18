@@ -57,6 +57,7 @@ public class InitCommand implements Runnable {
             session.execute("DROP TABLE IF EXISTS ready;");
             session.execute("DROP TABLE IF EXISTS delivery_confirmation;");
             session.execute("DROP TABLE IF EXISTS delivery;");
+            session.execute("DROP TABLE IF EXISTS confirmed;");
             session.execute("DROP TYPE IF EXISTS CLIENT_ORDER;");
 
             log.trace("Defining custom types.");

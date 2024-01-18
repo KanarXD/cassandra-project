@@ -4,6 +4,7 @@ import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import edu.put.database.dao.DAO;
 import edu.put.database.entities.*;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
@@ -28,11 +29,13 @@ public class RestaurantApplication extends Thread {
     private List<String> last_orders = List.of();
     private long offset = 5000;
 
+    @SneakyThrows
     @Override
     public void run() {
-        for (var category : categories) {
-            mapper.restaurants().insert(new Restaurant(category, id));
-        }
+//        for (var category : categories) {
+//          mapper.restaurants().insert(new Restaurant(category, id));
+//        }
+        mapper.restaurants().insert(new Restaurant(categories.get(id % categories.size()), id));
 
         while (true) {
             var requested = get_last_orders();
@@ -54,6 +57,7 @@ public class RestaurantApplication extends Thread {
             }
 
             confirm_deliveries();
+            Thread.sleep(random.nextInt(100));
         }
 
         // Confirm deliveries while they're pending.

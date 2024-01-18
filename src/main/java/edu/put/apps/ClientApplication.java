@@ -64,9 +64,35 @@ public class ClientApplication extends Thread {
         var category = Foods.categories().get(random.nextInt(Foods.categories().size()));
         var food = Foods.variants(category).get(random.nextInt(Foods.variants(category).size()));
         var order_id = UUID.randomUUID().toString();
-        var order = new Order(order_id, category, food, id);
-        ordered.add(new Pair(Instant.now(), order));
-        insert_order(order);
+        var restaurant_id = getRestaurant(category);
+        if (restaurant_id.isPresent()) {
+            var order = new Order(order_id, category, food, id);
+            ordered.add(new Pair(Instant.now(), order, restaurant_id.get()));
+            insert_order(order, restaurant_id.get());
+        } else {
+            log.warn("No restaurants available for performing category: `{}`.", category);
+        }
+
+    }
+
+    private Optional<Integer> getRestaurant(String category) {
+        try {
+            var restaurants = mapper.restaurants().get(category).all().stream().toList();
+            if (restaurants.isEmpty()) {
+                //log.warn("No restaurants available for performing category: `{}`.", category);
+                synchronized (this) {
+                    uninserted += 1;
+                }
+                return Optional.empty();
+            }
+            var restaurant = restaurants.get(random.nextInt(restaurants.size()));
+            return Optional.of(restaurant.restaurant_id());
+        } catch (NoNodeAvailableException error) {
+            log.warn("Client #{} encountered problem (probably overloaded cassandra nodes): {}", id, error.getMessage());
+        } catch (Exception error) {
+            log.warn("Client #{} encountered error: {}", id, error.getStackTrace());
+        }
+        return Optional.empty();
     }
 
     private void check_confirmed() {
@@ -85,30 +111,35 @@ public class ClientApplication extends Thread {
         }
     }
 
-    private void insert_order(Order order) {
-        try {
-            var restaurants = mapper.restaurants().get(order.category()).all().stream().toList();
-            if (restaurants.isEmpty()) {
-                log.warn("No restaurants available for performing order: `{}`.", order);
-                synchronized (this) {
-                    uninserted += 1;
-                }
-                return;
-            }
-            var restaurant = restaurants.get(random.nextInt(restaurants.size()));
+//    private void insert_order(Order order) {
+//        try {
+//            var restaurants = mapper.restaurants().get(order.category()).all().stream().toList();
+//            if (restaurants.isEmpty()) {
+//                log.warn("No restaurants available for performing order: `{}`.", order);
+//                synchronized (this) {
+//                    uninserted += 1;
+//                }
+//                return;
+//            }
+//            var restaurant = restaurants.get(random.nextInt(restaurants.size()));
+//
+//            insert_order(order, restaurant.restaurant_id());
+//        } catch (NoNodeAvailableException error) {
+//            log.warn("Client #{} encountered problem (probably overloaded cassandra nodes): {}", id, error.getMessage());
+//        } catch (Exception error) {
+//            log.warn("Client #{} encountered error: {}", id, error.getStackTrace());
+//        }
+//    }
 
-            var ordered = new Ordered(restaurant.restaurant_id(), Instant.now(), order.id(), order);
+    private void insert_order(Order order, int restaurant_id) {
 
-            if (!mapper.orders().insert(ordered)) {
-                log.warn("Order `{}` couldn't be inserted.", order);
-                synchronized (this) {
-                    uninserted += 1;
-                }
+        var ordered = new Ordered(restaurant_id, Instant.now(), order.id(), order);
+
+        if (!mapper.orders().insert(ordered)) {
+            log.warn("Order `{}` couldn't be inserted.", order);
+            synchronized (this) {
+                uninserted += 1;
             }
-        } catch (NoNodeAvailableException error) {
-            log.warn("Client #{} encountered problem (probably overloaded cassandra nodes): {}", id, error.getMessage());
-        } catch (Exception error) {
-            log.warn("Client #{} encountered error: {}", id, error.getStackTrace());
         }
     }
 
@@ -120,19 +151,21 @@ public class ClientApplication extends Thread {
      * @return whether there are orders to retry yet.
      */
     boolean retry_orders() {
+        check_confirmed();
+
         var time = Instant.now();
         var reinsert = new ArrayList<Pair>();
         var remove = new ArrayList<Pair>();
 
         for (var pair : ordered) {
             if (pair.timestamp().plus(Duration.ofMillis(offset)).isBefore(time)) {
-                reinsert.add(new Pair(time, pair.order()));
+                reinsert.add(new Pair(time, pair.order(), pair.restaurant_id()));
                 remove.add(pair);
             }
         }
 
         for (var order : reinsert) {
-            insert_order(order.order());
+            insert_order(order.order(), order.restaurant_id());
         }
 
         ordered.removeIf(remove::contains);
@@ -143,5 +176,5 @@ public class ClientApplication extends Thread {
 }
 
 // @formatter:off
-record Pair(Instant timestamp, Order order) {}
+record Pair(Instant timestamp, Order order, int restaurant_id) {}
 // @formatter:on
