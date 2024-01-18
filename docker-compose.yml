@@ -8,8 +8,8 @@ services:
     ports:
       - "9042:9042"
     environment: &cassandra-env
-      MAX_HEAP_SIZE: 256M
-      HEAP_NEWSIZE: 128M
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 256M
       CASSANDRA_SEEDS: cassandra-0,cassandra-1
     volumes:
       - "cassandra-0:/var/lib/cassandra"
