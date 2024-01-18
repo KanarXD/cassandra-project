@@ -3,7 +3,7 @@ version: "3"
 services:
   cassandra-0:
     # noinspection ComposeUnknownValues
-    image: &cassandra-image "cassandra:3.11.16"
+    image: &cassandra-image "cassandra:3.11.9"
     container_name: "cassandra-0"
     ports:
       - "9042:9042"
