@@ -3,29 +3,37 @@ package edu.put.database.config;
 import java.io.IOException;
 import java.util.Properties;
 
-public record Config(String contact_point, String keyspace, Replication replication) {
+public record Config(String datacenter, String contact_point, String keyspace, Replication replication) {
     public static Config load(String filename) throws RuntimeException {
         try {
             Properties config = new Properties();
             config.load(Config.class.getClassLoader().getResourceAsStream(filename));
 
+            var datacenter = config.getProperty("datacenter");
             var contact_point = config.getProperty("contact_point");
             var keyspace = config.getProperty("keyspace");
             var replication_strategy = config.getProperty("replication_strategy");
             var replication_factor = Integer.parseInt(config.getProperty("replication_factor"));
 
-            return new Config(contact_point, keyspace, new Replication(replication_strategy, replication_factor));
+            return new Config(datacenter, contact_point, keyspace, new Replication(replication_strategy, replication_factor));
         } catch (IOException ex) {
             throw new RuntimeException(String.format("Failed to read %s", filename));
         }
     }
 
-    public Config modify(String contact_point, String keyspace, String replication_strategy, Integer replication_factor) {
-        var _contact = contact_point == null ? this.contact_point : contact_point;
-        var _keyspace = keyspace == null ? this.keyspace : keyspace;
-        var _strategy = replication_strategy == null ? this.replication.strategy() : replication_strategy;
-        var _factor = replication_factor == null ? this.replication.factor() : replication_factor;
+    public Config with_datacenter(String datacenter) {
+        return new Config(datacenter, this.contact_point, this.keyspace, this.replication);
+    }
 
-        return new Config(_contact, _keyspace, new Replication(_strategy, _factor));
+    public Config with_contact_point(String contact_point) {
+        return new Config(this.datacenter, contact_point, this.keyspace, this.replication);
+    }
+
+    public Config with_keyspace(String keyspace) {
+        return new Config(this.datacenter, this.contact_point, keyspace, this.replication);
+    }
+
+    public Config with_replication(Replication replication) {
+        return new Config(this.datacenter, this.contact_point, this.keyspace, replication);
     }
 }

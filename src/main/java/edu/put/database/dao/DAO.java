@@ -15,7 +15,10 @@ public interface DAO {
     Ready ready();
 
     @DaoFactory
-    Confirm confirm();
+    ConfirmDelivery confirm_delivery();
+
+    @DaoFactory
+    ConfirmOrder confirm_order();
 
     @DaoFactory
     Delivery delivery();

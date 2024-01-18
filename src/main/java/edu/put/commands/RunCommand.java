@@ -50,7 +50,7 @@ public class RunCommand implements Runnable {
     public void run() {
         configure_logging();
 
-        var config = Config.load("config.properties").modify(null, keyspace, null, null);
+        var config = Config.load("config.properties").with_keyspace(keyspace);
         try (var session = CqlSession.builder().withKeyspace(config.keyspace()).build()) {
             var mapper = new DAOBuilder(session).build();
 

@@ -10,9 +10,9 @@ import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
 @CqlName("delivery")
 public record Delivered (
     @PartitionKey
-    int delivery_id,
-    @ClusteringColumn
     String order_id,
+    @ClusteringColumn
+    int delivery_id,
     @CqlName("details")
     Order order
 ) {}

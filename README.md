@@ -17,3 +17,6 @@ To run client-restaurant-delivery system run app with args
 ```bash
 <main class invocation> run [(-k, --keyspace) NAME] [(-c, --clients) COUNT] [(-r, --restaurants) COUNT] [(-d, --delivery-couriers) COUNT] [-v, --verbose]
 ```
+
+## App flow
+

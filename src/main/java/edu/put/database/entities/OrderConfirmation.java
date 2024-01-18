@@ -5,20 +5,14 @@ import com.datastax.oss.driver.api.mapper.annotations.CqlName;
 import com.datastax.oss.driver.api.mapper.annotations.Entity;
 import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
 
-import java.time.Instant;
-
 // @formatter:off
 @Entity
-@CqlName("orders")
-public record Ordered(
+@CqlName("confirmed")
+public record OrderConfirmation(
         @PartitionKey
-        int restaurant_id,
-        @ClusteringColumn
-        Instant timestamp,
-        @ClusteringColumn(1)
         String order_id,
-        @CqlName("details")
-        Order order
-) {}
 
+        @ClusteringColumn
+        int restaurant_id
+) {}
 // @formatter:on

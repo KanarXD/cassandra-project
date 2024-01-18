@@ -32,9 +32,49 @@ services:
     volumes:
       - "cassandra-2:/var/lib/cassandra"
     depends_on:
+      - "cassandra-0"
       - "cassandra-1"
+
+  cassandra-3:
+    image: *cassandra-image
+    container_name: "cassandra-3"
+    environment:
+      <<: *cassandra-env
+    volumes:
+      - "cassandra-3:/var/lib/cassandra"
+    depends_on:
+      - "cassandra-0"
+      - "cassandra-1"
+      - "cassandra-2"
+
+  cassandra-4:
+    image: *cassandra-image
+    container_name: "cassandra-4"
+    environment:
+      <<: *cassandra-env
+    volumes:
+      - "cassandra-4:/var/lib/cassandra"
+    depends_on:
+      - "cassandra-0"
+      - "cassandra-1"
+      - "cassandra-3"
+
+  cassandra-5:
+    image: *cassandra-image
+    container_name: "cassandra-5"
+    environment:
+      <<: *cassandra-env
+    volumes:
+      - "cassandra-5:/var/lib/cassandra"
+    depends_on:
+      - "cassandra-0"
+      - "cassandra-1"
+      - "cassandra-4"
 
 volumes:
   cassandra-0:
   cassandra-1:
   cassandra-2:
+  cassandra-3:
+  cassandra-4:
+  cassandra-5:

@@ -3,7 +3,10 @@ package edu.put.commands;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import edu.put.database.config.Config;
+import edu.put.database.config.Driver;
+import edu.put.database.config.Replication;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -31,9 +34,12 @@ public class InitCommand implements Runnable {
         configure_logging();
 
         log.info("Configuring database.");
-        var config = Config.load("config.properties").modify(contact_point, keyspace, replication_strategy, replication_factor);
+        var config = Config.load("config.properties")
+                .with_contact_point(contact_point)
+                .with_keyspace(keyspace)
+                .with_replication(Replication.standard().with_strategy(replication_strategy).with_factor(replication_factor));
         log.info("Loaded configuration: {}", config);
-        try (var session = CqlSession.builder().build()) {
+        try (var session = CqlSession.builder().withConfigLoader(Driver.setup()).build()) {
             // Create keyspace in database.
             log.trace("Cleaning up keyspace.");
             session.execute(String.format("DROP KEYSPACE IF EXISTS %s;", config.keyspace()));
@@ -79,10 +85,19 @@ public class InitCommand implements Runnable {
                         timestamp TIMESTAMP,
                         order_id VARCHAR,
                         details CLIENT_ORDER,
-                        PRIMARY KEY (restaurant_id, timestamp)
+                        PRIMARY KEY (restaurant_id, timestamp, order_id)
                     )
-                    WITH CLUSTERING ORDER BY (timestamp DESC);
+                    WITH CLUSTERING ORDER BY (timestamp DESC, order_id ASC);
                     """);
+
+//            session.execute("""
+//                    CREATE TABLE confirmed (
+//                        order_id VARCHAR,
+//                        restaurant_id INT,
+//                        PRIMARY KEY (order_id, restaurant_id)
+//                    )
+//                    WITH CLUSTERING ORDER BY (restaurant_id ASC);
+//                    """);
 
             session.execute("""
                     CREATE TABLE ready (
@@ -107,11 +122,12 @@ public class InitCommand implements Runnable {
 
             session.execute("""
                     CREATE TABLE delivery (
-                        delivery_id INT,
                         order_id VARCHAR,
+                        delivery_id INT,
                         details CLIENT_ORDER,
-                        PRIMARY KEY (delivery_id, order_id)
-                    );
+                        PRIMARY KEY (order_id, delivery_id)
+                    )
+                    WITH CLUSTERING ORDER BY (delivery_id ASC);
                     """);
 
             log.info("Database configured.");

@@ -1,74 +1,55 @@
-//package edu.put.apps;
-//
-//import com.datastax.driver.mapping.MappingManager;
-//import edu.put.backend.BackendSession;
-//import edu.put.records.orders.Delivered;
-//import lombok.RequiredArgsConstructor;
-//import lombok.extern.slf4j.Slf4j;
-//
-//import java.util.List;
-//import java.util.Random;
-//
-//@Slf4j
-//@RequiredArgsConstructor
-//public class DeliveryApplication extends Thread {
-//    private final int id;
-//    private final BackendSession session;
-//    private final Random random = new Random();
-//    private MappingManager mapping;
-//
-//    @SuppressWarnings("InfiniteLoopStatement")
-//    @Override
-//    public void run() {
-//        try {
-//            mapping = new MappingManager(session.session());
-//
-//            for (int i = 0; true; i++) {
-//                var order = get_order();
-//                delete_order(order);
-//                create_delivered_order(order, String.format("%d:%d", id, i));
-//                log.debug("Delivery Courier #{} | Ordered order #{} is: {}", id, i, order);
-//            }
-//        } catch (InterruptedException e) {
-//            log.info("Delivery Courier #{} received interrupt signal. Shutting down.", id);
-//        } catch (Exception e) {
-//            log.error("Delivery Courier #{} failed. Error: {}", id, e.getMessage());
-//        }
-//    }
-//
-//    private void create_delivered_order(Delivered order, String id) {
-//        session.execute(String.format("INSERT INTO ready_orders (id, info) VALUES ('%s', '%s')", id, order));
-//    }
-//
-//    private void delete_order(Delivered orderInProgress) {
-//        session.execute(String.format("DELETE FROM orders_in_progress WHERE order_id='%s' AND creation_time='%s'", orderInProgress.getOrderId(), orderInProgress.getCreationTime().toInstant()));
-//    }
-//
-//    private Delivered get_order() throws InterruptedException {
-//        while (true) {
-//            var orders = get_top_orders(10);
-//            var order = orders.get(random.nextInt(orders.size()));
-//            var query = String.format("SELECT * FROM orders_in_progress WHERE order_id = '%s';", order.getOrderId());
-//            if (!session.execute(query).all().isEmpty()) {
-//                return order;
-//            }
-//        }
-//    }
-//
-//    @SuppressWarnings({"SameParameterValue"})
-//    private List<Delivered> get_top_orders(int limit) throws InterruptedException {
-//        var mapper = mapping.mapper(Delivered.class);
-//        List<Delivered> orders = List.of();
-//
-//        while (orders.isEmpty()) {
-//            var results = session.execute(String.format("SELECT * FROM orders_in_progress LIMIT %d;", limit));
-//            orders = mapper.map(results).all();
-//
-//            if (orders.isEmpty() && Thread.currentThread().isInterrupted()) {
-//                // Thread was interrupted, so no new orders are coming and we should finish.
-//                throw new InterruptedException();
-//            }
-//        }
-//        return orders;
-//    }
-//}
+package edu.put.apps;
+
+import com.datastax.oss.driver.api.core.NoNodeAvailableException;
+import edu.put.database.dao.DAO;
+import edu.put.database.entities.DeliveryConfirmation;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.Random;
+
+@Slf4j
+@RequiredArgsConstructor
+public class DeliveryApplication extends Thread {
+    private final int id;
+    private final DAO mapper;
+    private final Random random = new Random();
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    // Can be changed to some more sane value, like yesterday at midnight.
+    private Instant last_timestamp = Instant.ofEpochSecond(0);
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                ask_for_confirmation();
+                Thread.sleep(random.nextInt(500));
+            }
+        } catch (InterruptedException e) {
+            log.info("Delivery Courier #{} received interrupt signal. Shutting down.", id);
+        } catch (Exception e) {
+            log.error("Delivery Courier #{} failed. Error: {}", id, e.getMessage());
+        }
+    }
+
+    private void ask_for_confirmation() {
+        try {
+            var date = formatter.format(LocalDate.now());
+            var ready = mapper.ready().get(date, last_timestamp.minus(1, ChronoUnit.MINUTES)).all();
+
+            for (var order : ready) {
+                mapper.confirm_delivery().insert(new DeliveryConfirmation(order.order_id(), id, order.order()));
+                last_timestamp = order.timestamp();
+            }
+        } catch (NoNodeAvailableException error) {
+            log.warn("Couldn't request delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
+        }
+    }
+}

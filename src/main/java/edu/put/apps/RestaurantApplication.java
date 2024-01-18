@@ -1,19 +1,17 @@
 package edu.put.apps;
 
-//import edu.put.backend.Foods;
-
+import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import edu.put.database.dao.DAO;
-import edu.put.database.entities.Delivered;
-import edu.put.database.entities.Ordered;
-import edu.put.database.entities.Ready;
-import edu.put.database.entities.Restaurant;
+import edu.put.database.entities.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -26,7 +24,9 @@ public class RestaurantApplication extends Thread {
     private final Random random = new Random();
     private final Instant last_timestamp = Instant.ofEpochSecond(0);
     private final List<String> not_delivered_orders = new ArrayList<>();
+    private final List<UnconfirmedOrder> orders = new ArrayList<>();
     private List<String> last_orders = List.of();
+    private long offset = 5000;
 
     @Override
     public void run() {
@@ -35,34 +35,33 @@ public class RestaurantApplication extends Thread {
         }
 
         while (true) {
-            var orders = get_last_orders();
-            orders.removeIf(order -> last_orders.contains(order.order_id()));
-            last_orders = orders.stream().map(Ordered::order_id).toList();
+            var requested = get_last_orders();
+            requested.removeIf(order -> last_orders.contains(order.order_id()));
+            last_orders = requested.stream().map(Ordered::order_id).toList();
 
-            if (orders.isEmpty() && Thread.interrupted()) {
+            if (requested.isEmpty() && Thread.currentThread().isInterrupted()) {
                 // No new orders were placed, and we received finish signal, so we can finish processing.
                 log.info("Restaurant #{} ({}) received interrupt signal. Shutting down.", id, String.join(", ", categories));
                 break;
             }
 
             var formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            for (var order : orders) {
+            for (var order : requested) {
                 var date = formatter.format(LocalDate.now());
                 var ready = new Ready(date, Instant.now(), order.order_id(), order.order());
-                if (mapper.ready().insert(ready)) {
-                    // We're doing check on insertion to avoid infinite confirmation loop.
-                    not_delivered_orders.add(order.order_id());
-                }
+                insert_ready(new UnconfirmedOrder(Instant.now(), ready));
+                mapper.confirm_order().insert(new OrderConfirmation(order.order_id(), id));
             }
 
-            //noinspection ResultOfMethodCallIgnored
             confirm_deliveries();
         }
 
         // Confirm deliveries while they're pending.
-        while (confirm_deliveries()) {
+        while (!orders.isEmpty()) {
             try {
-                Thread.sleep(100);
+                confirm_deliveries();
+                retry_orders();
+                Thread.sleep(Math.min(offset, 500));
             } catch (InterruptedException e) {
                 // If thread was interrupted twice it will finish without waiting for all confirmations.
                 break;
@@ -70,25 +69,75 @@ public class RestaurantApplication extends Thread {
         }
     }
 
-    private boolean confirm_deliveries() {
-        var finished = new ArrayList<String>();
-        for (var order : not_delivered_orders) {
-            var couriers = mapper.confirm().get(order).all().stream().toList();
-            if(couriers.isEmpty()) {
-                continue;
+
+    /**
+     * Sets time offset after which retry should be performed.
+     *
+     * @param offset time in milliseconds
+     * @return modified instance of RestaurantApplication
+     */
+    public RestaurantApplication with_retry_offset(long offset) {
+        this.offset = offset;
+        return this;
+    }
+
+    private void confirm_deliveries() {
+        for (var order : orders) {
+            confirm_delivery(order);
+        }
+    }
+
+    private void confirm_delivery(UnconfirmedOrder order) {
+        try {
+            var couriers = mapper.confirm_delivery().get(order.order().order_id()).all().stream().toList();
+            if (couriers.isEmpty()) {
+                return;
             }
+
             var courier = couriers.get(random.nextInt(couriers.size()));
-            var delivery = new Delivered(courier.delivery_id(), courier.order_id(), courier.order());
+            var delivery = new Delivered(courier.order_id(), courier.delivery_id(), courier.order());
             if (mapper.delivery().insert(delivery)) {
-                finished.add(order);
+                orders.remove(order);
+            }
+        } catch (NoNodeAvailableException error) {
+            log.warn("Couldn't confirm delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
+        }
+    }
+
+    private void insert_ready(UnconfirmedOrder order) {
+        try {
+            orders.add(order);
+            mapper.ready().insert(order.order());
+        } catch (NoNodeAvailableException error) {
+            log.warn("Couldn't insert ready order. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
+        }
+    }
+
+    private void retry_orders() {
+        var time = Instant.now();
+        var reinsert = new ArrayList<UnconfirmedOrder>();
+        var remove = new ArrayList<UnconfirmedOrder>();
+
+        for (var order : orders) {
+            if (order.timestamp().plus(Duration.ofMillis(offset)).isBefore(time)) {
+                reinsert.add(new UnconfirmedOrder(time, order.order()));
+                remove.add(order);
             }
         }
 
-        not_delivered_orders.removeIf(finished::contains);
-        return !not_delivered_orders.isEmpty();
+        for (var order : reinsert) {
+            insert_ready(order);
+        }
+
+        orders.removeIf(remove::contains);
+        orders.addAll(reinsert);
     }
 
     private List<Ordered> get_last_orders() {
         return mapper.orders().get(id, last_timestamp).all();
     }
 }
+
+// @formatter:off
+record UnconfirmedOrder(Instant timestamp, Ready order) {}
+// @formatter:on

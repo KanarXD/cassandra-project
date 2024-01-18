@@ -8,7 +8,7 @@ import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
 // @formatter:off
 @Entity
 @CqlName("delivery_confirmation")
-public record Confirmation(
+public record DeliveryConfirmation(
         @PartitionKey
         String order_id,
         @ClusteringColumn
