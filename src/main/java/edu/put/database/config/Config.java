@@ -22,18 +22,33 @@ public record Config(String datacenter, String contact_point, String keyspace, R
     }
 
     public Config with_datacenter(String datacenter) {
+        if (datacenter == null) {
+            return this;
+        }
         return new Config(datacenter, this.contact_point, this.keyspace, this.replication);
     }
 
     public Config with_contact_point(String contact_point) {
+        if (contact_point == null) {
+            return this;
+        }
+
         return new Config(this.datacenter, contact_point, this.keyspace, this.replication);
     }
 
     public Config with_keyspace(String keyspace) {
+        if (keyspace == null) {
+            return this;
+        }
+
         return new Config(this.datacenter, this.contact_point, keyspace, this.replication);
     }
 
     public Config with_replication(Replication replication) {
+        if (replication == null) {
+            return this;
+        }
+
         return new Config(this.datacenter, this.contact_point, this.keyspace, replication);
     }
 }
