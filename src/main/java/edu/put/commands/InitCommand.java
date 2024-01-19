@@ -49,15 +49,15 @@ public class InitCommand implements Runnable {
             log.error("Error occurred when creating keyspace: {}", error.getMessage());
         }
 
-        try (var session = CqlSession.builder().withKeyspace(config.keyspace()).build()) {
+        try (var session = CqlSession.builder().withConfigLoader(Driver.setup()).withKeyspace(config.keyspace()).build()) {
             // Cleanup tables.
             log.trace("Cleaning up.");
             session.execute("DROP TABLE IF EXISTS restaurants;");
             session.execute("DROP TABLE IF EXISTS orders;");
+            session.execute("DROP TABLE IF EXISTS confirmed;");
             session.execute("DROP TABLE IF EXISTS ready;");
             session.execute("DROP TABLE IF EXISTS delivery_confirmation;");
             session.execute("DROP TABLE IF EXISTS delivery;");
-            session.execute("DROP TABLE IF EXISTS confirmed;");
             session.execute("DROP TYPE IF EXISTS CLIENT_ORDER;");
 
             log.trace("Defining custom types.");
