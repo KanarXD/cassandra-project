@@ -52,7 +52,7 @@ public class RunCommand implements Runnable {
         configure_logging();
 
         var config = Config.load("config.properties").with_keyspace(keyspace);
-        try (var session = CqlSession.builder().withKeyspace(config.keyspace()).build()) {
+        try (var session = CqlSession.builder().withLocalDatacenter("datacenter1").withKeyspace(config.keyspace()).build()) {
             var mapper = new DAOBuilder(session).build();
 
             var client_apps = new ClientApplication[clients];
@@ -80,6 +80,7 @@ public class RunCommand implements Runnable {
                 delivery_apps[id] = app;
             }
 
+            log.info("joining client applications.");
             for (var app : client_apps) {
                 try {
                     app.join();
@@ -88,6 +89,7 @@ public class RunCommand implements Runnable {
                 }
             }
 
+            log.info("interrupting restaurant applications.");
             for (var app : restaurant_apps) {
                 try {
                     app.interrupt();
@@ -97,22 +99,35 @@ public class RunCommand implements Runnable {
             }
 
             // <DEBUG>
-            for (var app : delivery_apps) {
+//            log.info("interrupting delivery applications.");
+//            for (var app : delivery_apps) {
+//                try {
+//                    app.interrupt();
+//                } catch (Exception error) {
+//                    throw new RuntimeException(error);
+//                }
+//            }
+            // </DEBUG>
+
+            log.info("join restaurant applications.");
+            for (var app : restaurant_apps) {
                 try {
-                    app.interrupt();
+                    app.join();
                 } catch (Exception error) {
                     throw new RuntimeException(error);
                 }
             }
-            // </DEBUG>
 
+            log.info("join delivery applications.");
             for (var app : delivery_apps) {
                 try {
                     app.join();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                } catch (Exception error) {
+                    throw new RuntimeException(error);
                 }
             }
+
+
         }
 //        try (var cluster = cluster.builder().addcontactpoint(config.contact_point()).build()) {
 //            log.info("initializing session.");
@@ -187,9 +202,9 @@ public class RunCommand implements Runnable {
 
 
         var loggers = List.of(
-//                ClientApplication.class,
-//                DeliveryApplication.class,
-//                RestaurantApplication.class,
+                ClientApplication.class,
+                DeliveryApplication.class,
+                RestaurantApplication.class,
                 BackendSession.class, InitCommand.class, RunCommand.class,
 //                Ordered.class,
 //                Delivered.class,

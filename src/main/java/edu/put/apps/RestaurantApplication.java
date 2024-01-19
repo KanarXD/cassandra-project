@@ -4,7 +4,6 @@ import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import edu.put.database.dao.DAO;
 import edu.put.database.entities.*;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
@@ -20,71 +19,97 @@ import java.util.Random;
 @Slf4j
 @RequiredArgsConstructor
 public class RestaurantApplication extends Thread {
+    // App configuration parameters.
     private final int id;
     private final DAO mapper;
     private final List<String> categories;
+    private long offset = 5000;
+
+    // Internal app state.
     private final Random random = new Random();
     private Instant last_requested_timestamp = Instant.ofEpochSecond(0);
     private Instant last_timestamp = Instant.ofEpochSecond(0);
-    private final List<String> not_delivered_orders = new ArrayList<>();
     private final List<UnconfirmedOrder> orders = new ArrayList<>();
     private List<String> last_orders = List.of();
-    private long offset = 5000;
 
-    @SneakyThrows
+
     @Override
     public void run() {
-//        for (var category : categories) {
-//          mapper.restaurants().insert(new Restaurant(category, id));
-//        }
-        mapper.restaurants().insert(new Restaurant(categories.get(id % categories.size()), id));
+        try {
+//            for (var category : categories) {
+//                mapper.restaurants().insert(new Restaurant(category, id));
+//            }
+            mapper.restaurants().insert(new Restaurant(categories.get(id % categories.size()), id));
 
-        while (true) {
-            var requested = get_last_orders();
-            if (!requested.isEmpty()) {
-                last_requested_timestamp = requested.get(0).timestamp();
-            }
-            requested.removeIf(order -> {
-                if (order.timestamp().isAfter(last_timestamp)) {
-                    last_timestamp = order.timestamp();
+            work(false);
+        } catch (InterruptedException e) {
+            log.info("Restaurant #{} received interrupt signal.", id);
+            while (!orders.isEmpty()) {
+                try {
+                    work(true);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
                 }
-                return last_orders.contains(order.order_id());
-            });
-            if (last_requested_timestamp.isAfter(last_timestamp.minus(5, ChronoUnit.SECONDS))) {
-                last_timestamp = last_requested_timestamp;
-            } else {
-                last_timestamp = last_timestamp.minus(5, ChronoUnit.SECONDS);
             }
-            last_orders = requested.stream().map(Ordered::order_id).toList();
-
-            if (requested.isEmpty() && Thread.currentThread().isInterrupted()) {
-                // No new orders were placed, and we received finish signal, so we can finish processing.
-                log.info("Restaurant #{} ({}) received interrupt signal. Shutting down.", id, String.join(", ", categories));
-                break;
-            }
-
-            var formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            for (var order : requested) {
-                var date = formatter.format(LocalDate.now());
-                var ready = new Ready(date, Instant.now(), order.order_id(), order.order());
-                insert_ready(new UnconfirmedOrder(Instant.now(), ready));
-                mapper.confirm_order().insert(new OrderConfirmation(order.order_id(), id));
-            }
-
-//            confirm_deliveries();
-            Thread.sleep(random.nextInt(100));
+            log.info("Restaurant #{} received interrupt signal. Shutting down.", id);
+        } catch (Exception e) {
+            log.error("Restaurant #{} failed. Error: {}", id, e.getMessage());
         }
 
-        // Confirm deliveries while they're pending.
-        while (!orders.isEmpty()) {
+//        // Confirm deliveries while they're pending.
+//        while (!orders.isEmpty()) {
+//            try {
+//                confirm_deliveries();
+////                retry_orders();
+//                Thread.sleep(Math.min(offset, 500));
+//            } catch (InterruptedException e) {
+//                // If thread was interrupted twice it will finish without waiting for all confirmations.
+//                break;
+//            }
+//        }
+    }
+
+    private void work(boolean finish) throws InterruptedException {
+        while (true) {
             try {
+                var requested = get_last_orders();
+                if (!requested.isEmpty()) {
+                    last_requested_timestamp = requested.get(0).timestamp();
+                }
+                requested.removeIf(order -> {
+                    if (order.timestamp().isAfter(last_timestamp)) {
+                        last_timestamp = order.timestamp();
+                    }
+                    return last_orders.contains(order.order_id());
+                });
+                if (last_requested_timestamp.isAfter(last_timestamp.minus(5, ChronoUnit.SECONDS))) {
+                    last_timestamp = last_requested_timestamp;
+                } else {
+                    last_timestamp = last_timestamp.minus(5, ChronoUnit.SECONDS);
+                }
+                last_orders = requested.stream().map(Ordered::order_id).toList();
+
+
+
+                var formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                for (var order : requested) {
+                    var date = formatter.format(LocalDate.now());
+                    var ready = new Ready(date, Instant.now(), order.order_id(), order.order());
+                    insert_ready(new UnconfirmedOrder(Instant.now(), ready));
+                    mapper.confirm_order().insert(new OrderConfirmation(order.order_id(), id));
+                }
+
                 confirm_deliveries();
-//                retry_orders();
-                Thread.sleep(Math.min(offset, 500));
-            } catch (InterruptedException e) {
-                // If thread was interrupted twice it will finish without waiting for all confirmations.
-                break;
+
+                if (requested.isEmpty() && (finish || Thread.currentThread().isInterrupted())) {
+                    // No new orders were placed, and we received finish signal, so we can finish processing.
+                    log.info("Restaurant #{} ({}) received interrupt signal. ending work.", id, String.join(", ", categories));
+                    break;
+                }
+            } catch (NoNodeAvailableException e) {
+                log.warn("Restaurant #{}, no node avalible", id);
             }
+            Thread.sleep(random.nextInt(100));
         }
     }
 

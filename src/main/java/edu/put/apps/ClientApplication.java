@@ -113,26 +113,33 @@ public class ClientApplication extends Thread {
     private void make_order(Order order) {
         orders.add(new UnconfirmedOrder(Instant.now(), order));
 
-        var restaurant = get_restaurant(order.category());
-        if (restaurant != null) {
-            var ordered = new Ordered(restaurant, Instant.now(), order.id(), order);
-            try {
-                if (!mapper.orders().insert(ordered)) {
-                    log.warn("Order `{}` couldn't be inserted.", order);
-                    synchronized (this) {
-                        missed_writes += 1;
-                    }
-                }
-            } catch (NoNodeAvailableException error) {
-                log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
+        Optional<Integer> restaurant;
+        do {
+            restaurant = Optional.ofNullable(get_restaurant(order.category()));
+        } while (restaurant.isEmpty());
+
+//        if (restaurant != null) {
+        var ordered = new Ordered(restaurant.get(), Instant.now(), order.id(), order);
+        try {
+            log.trace("Client ${} inserting ordered: {}", id, ordered);
+            if (!mapper.orders().insert(ordered)) {
+                log.warn("Order `{}` couldn't be inserted.", order);
                 synchronized (this) {
                     missed_writes += 1;
                 }
-            } catch (Exception error) {
-                log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
-                throw error;
             }
+        } catch (NoNodeAvailableException error) {
+            log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
+            synchronized (this) {
+                missed_writes += 1;
+            }
+        } catch (Exception error) {
+            log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
+            throw error;
         }
+//        } else {
+//            log.warn("Client #{} failed to make order no restaurants", id);
+//        }
     }
 
 //    private void insert_order(Order order) {

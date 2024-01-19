@@ -28,7 +28,7 @@ public class DeliveryApplication extends Thread {
     @Override
     public void run() {
         try {
-            while (true) {
+            for (int i =0 ; i<100;i++) {
                 ask_for_confirmation();
                 Thread.sleep(random.nextInt(500));
             }
