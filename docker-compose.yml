@@ -5,6 +5,7 @@ services:
     # noinspection ComposeUnknownValues
     image: &cassandra-image "cassandra:3.11.9"
     container_name: "cassandra-0"
+    restart: &restart-policy always
     ports:
       - "9042:9042"
     environment: &cassandra-env
@@ -17,6 +18,7 @@ services:
   cassandra-1:
     image: *cassandra-image
     container_name: "cassandra-1"
+    restart: *restart-policy
     environment:
       <<: *cassandra-env
     volumes:
@@ -27,6 +29,7 @@ services:
   cassandra-2:
     image: *cassandra-image
     container_name: "cassandra-2"
+    restart: *restart-policy
     environment:
       <<: *cassandra-env
     volumes:
@@ -38,6 +41,7 @@ services:
   cassandra-3:
     image: *cassandra-image
     container_name: "cassandra-3"
+    restart: *restart-policy
     environment:
       <<: *cassandra-env
     volumes:
@@ -50,6 +54,7 @@ services:
   cassandra-4:
     image: *cassandra-image
     container_name: "cassandra-4"
+    restart: *restart-policy
     environment:
       <<: *cassandra-env
     volumes:
@@ -62,6 +67,7 @@ services:
   cassandra-5:
     image: *cassandra-image
     container_name: "cassandra-5"
+    restart: *restart-policy
     environment:
       <<: *cassandra-env
     volumes:
