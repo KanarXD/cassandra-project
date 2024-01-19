@@ -11,6 +11,6 @@ public interface Delivery {
     @Insert
     boolean insert(Delivered order);
 
-    @Query("SELECT * FROM delivered")
+    @Query("SELECT * FROM delivery")
     PagingIterable<Delivered> get_all();
 }

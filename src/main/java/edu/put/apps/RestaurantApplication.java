@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,7 +24,8 @@ public class RestaurantApplication extends Thread {
     private final DAO mapper;
     private final List<String> categories;
     private final Random random = new Random();
-    private final Instant last_timestamp = Instant.ofEpochSecond(0);
+    private Instant last_requested_timestamp = Instant.ofEpochSecond(0);
+    private Instant last_timestamp = Instant.ofEpochSecond(0);
     private final List<String> not_delivered_orders = new ArrayList<>();
     private final List<UnconfirmedOrder> orders = new ArrayList<>();
     private List<String> last_orders = List.of();
@@ -69,7 +71,7 @@ public class RestaurantApplication extends Thread {
                 mapper.confirm_order().insert(new OrderConfirmation(order.order_id(), id));
             }
 
-            confirm_deliveries();
+//            confirm_deliveries();
             Thread.sleep(random.nextInt(100));
         }
 
@@ -77,7 +79,7 @@ public class RestaurantApplication extends Thread {
         while (!orders.isEmpty()) {
             try {
                 confirm_deliveries();
-                retry_orders();
+//                retry_orders();
                 Thread.sleep(Math.min(offset, 500));
             } catch (InterruptedException e) {
                 // If thread was interrupted twice it will finish without waiting for all confirmations.
@@ -101,21 +103,23 @@ public class RestaurantApplication extends Thread {
         orders.removeIf(this::confirm_delivery);
     }
 
-    private void confirm_delivery(UnconfirmedOrder order) {
+    private boolean confirm_delivery(UnconfirmedOrder order) {
         try {
             var couriers = mapper.confirm_delivery().get(order.order().order_id()).all().stream().toList();
             if (couriers.isEmpty()) {
-                return;
+                return false;
             }
 
             var courier = couriers.get(random.nextInt(couriers.size()));
             var delivery = new Delivered(courier.order_id(), courier.delivery_id(), courier.order());
             if (mapper.delivery().insert(delivery)) {
-                orders.remove(order);
+                return true;
             }
         } catch (NoNodeAvailableException error) {
             log.warn("Couldn't confirm delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
         }
+
+        return false;
     }
 
     private void insert_ready(UnconfirmedOrder order) {
@@ -155,7 +159,3 @@ public class RestaurantApplication extends Thread {
     record UnconfirmedOrder(Instant timestamp, Ready order) {}
     // @formatter:on
 }
-
-//// @formatter:off
-//record UnconfirmedOrder(Instant timestamp, Ready order) {}
-//// @formatter:on

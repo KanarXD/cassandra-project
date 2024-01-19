@@ -63,14 +63,15 @@ public class ClientApplication extends Thread {
         log.info("start client: {}", id);
         try {
             for (int i = 0; i < 100; i++) {
-                prepare_order();
-                retry_pending_orders();
+                var order = prepare_order();
+                make_order(order);
+//                retry_pending_orders();
                 Thread.sleep(random.nextInt(100));
             }
 
-            while (retry_pending_orders()) {
-                Thread.sleep(offset);
-            }
+//            while (retry_pending_orders()) {
+//                Thread.sleep(offset);
+//            }
             log.trace("Client #{} made all their orders.", id);
 
         } catch (Exception error) {
