@@ -5,7 +5,6 @@ import edu.put.backend.Foods;
 import edu.put.database.dao.DAO;
 import edu.put.database.entities.Order;
 import edu.put.database.entities.Ordered;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
@@ -13,33 +12,38 @@ import java.time.Instant;
 import java.util.*;
 
 @Slf4j
-@RequiredArgsConstructor
 public class ClientApplication extends Thread {
-    private static int uninserted = 0;
+    // Statistics.
+    private static int missed_writes = 0;
+    private static int missed_reads = 0;
+
+    // App Configuration parameters.
     private final int id;
     private final DAO mapper;
-    private final Random random = new Random();
-    private final List<Pair> ordered = new ArrayList<>();
+
     private long offset = 5000;
 
-    @Override
-    public void run() {
-        try {
-            for (int i = 0; i < 100; i++) {
-                make_order();
-                retry_orders();
-                Thread.sleep(random.nextInt(100));
-            }
+    // Internal app state.
+    private final Random random = new Random();
+    private final List<UnconfirmedOrder> orders = new ArrayList<>();
 
-            while (retry_orders()) {
+    /**
+     * @return number of failed writes performed by all clients.
+     */
+    public int missed_writes() {
+        return missed_writes;
+    }
 
-                Thread.sleep(offset);
-            }
-            log.trace("Client #{} made all their orders.", id);
+    /**
+     * @return number of failed reads performed by all clients.
+     */
+    public int missed_reads() {
+        return missed_reads;
+    }
 
-        } catch (Exception error) {
-            log.error("Client #{} failed: {}", id, error.getMessage());
-        }
+    public ClientApplication(int id, DAO mapper) {
+        this.id = id;
+        this.mapper = mapper;
     }
 
     /**
@@ -53,61 +57,79 @@ public class ClientApplication extends Thread {
         return this;
     }
 
-    /**
-     * @return number of failed attempts to made orders.
-     */
-    public int failure_count() {
-        return uninserted;
-    }
 
-    private void make_order() {
-        var category = Foods.categories().get(random.nextInt(Foods.categories().size()));
-        var food = Foods.variants(category).get(random.nextInt(Foods.variants(category).size()));
-        var order_id = UUID.randomUUID().toString();
-        var restaurant_id = getRestaurant(category);
-        if (restaurant_id.isPresent()) {
-            var order = new Order(order_id, category, food, id);
-            ordered.add(new Pair(Instant.now(), order, restaurant_id.get()));
-            insert_order(order, restaurant_id.get());
-        } else {
-            log.warn("No restaurants available for performing category: `{}`.", category);
-        }
-
-    }
-
-    private Optional<Integer> getRestaurant(String category) {
+    @Override
+    public void run() {
         try {
-            var restaurants = mapper.restaurants().get(category).all().stream().toList();
-            if (restaurants.isEmpty()) {
-                //log.warn("No restaurants available for performing category: `{}`.", category);
-                synchronized (this) {
-                    uninserted += 1;
-                }
-                return Optional.empty();
+            for (int i = 0; i < 100; i++) {
+                prepare_order();
+                retry_pending_orders();
+                Thread.sleep(random.nextInt(100));
             }
-            var restaurant = restaurants.get(random.nextInt(restaurants.size()));
-            return Optional.of(restaurant.restaurant_id());
-        } catch (NoNodeAvailableException error) {
-            log.warn("Client #{} encountered problem (probably overloaded cassandra nodes): {}", id, error.getMessage());
+
+            while (retry_pending_orders()) {
+                Thread.sleep(offset);
+            }
+            log.trace("Client #{} made all their orders.", id);
+
         } catch (Exception error) {
-            log.warn("Client #{} encountered error: {}", id, error.getStackTrace());
+            log.error("Client #{} failed: {}", id, error.getMessage());
         }
-        return Optional.empty();
+    }
+
+    private Order prepare_order() {
+        try {
+            var category = Foods.categories().get(random.nextInt(Foods.categories().size()));
+            var food = Foods.variants(category).get(random.nextInt(Foods.variants(category).size()));
+            var order_id = UUID.randomUUID().toString();
+            return new Order(order_id, category, food, id);
+        } catch (NullPointerException | IllegalArgumentException | IndexOutOfBoundsException error) {
+            log.error("Empty categories or category variants.");
+            System.exit(1);
+        }
+
+        // NOTE: Unreachable in practice.
+        return null;
     }
 
     private void check_confirmed() {
         try {
-            var remove = new ArrayList<Pair>();
-            for (var order : ordered) {
+            var remove = new ArrayList<UnconfirmedOrder>();
+            for (var order : orders) {
                 if (mapper.confirm_order().get(order.order().id()) != null) {
                     remove.add(order);
                 }
             }
 
-            ordered.removeIf(remove::contains);
+            orders.removeIf(remove::contains);
 
         } catch (NoNodeAvailableException error) {
             log.warn("Couldn't confirm delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
+        }
+    }
+
+    private void make_order(Order order) {
+        orders.add(new UnconfirmedOrder(Instant.now(), order));
+
+        var restaurant = get_restaurant(order.category());
+        if (restaurant != null) {
+            var ordered = new Ordered(restaurant, Instant.now(), order.id(), order);
+            try {
+                if (!mapper.orders().insert(ordered)) {
+                    log.warn("Order `{}` couldn't be inserted.", order);
+                    synchronized (this) {
+                        missed_writes += 1;
+                    }
+                }
+            } catch (NoNodeAvailableException error) {
+                log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
+                synchronized (this) {
+                    missed_writes += 1;
+                }
+            } catch (Exception error) {
+                log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
+                throw error;
+            }
         }
     }
 
@@ -131,18 +153,6 @@ public class ClientApplication extends Thread {
 //        }
 //    }
 
-    private void insert_order(Order order, int restaurant_id) {
-
-        var ordered = new Ordered(restaurant_id, Instant.now(), order.id(), order);
-
-        if (!mapper.orders().insert(ordered)) {
-            log.warn("Order `{}` couldn't be inserted.", order);
-            synchronized (this) {
-                uninserted += 1;
-            }
-        }
-    }
-
     /**
      * This is implementation of timeout-retry policy of orders.
      * Every order made (or failed to made) is held in local list with their insertion time.
@@ -150,31 +160,59 @@ public class ClientApplication extends Thread {
      *
      * @return whether there are orders to retry yet.
      */
-    boolean retry_orders() {
-        check_confirmed();
-
+    boolean retry_pending_orders() {
         var time = Instant.now();
-        var reinsert = new ArrayList<Pair>();
-        var remove = new ArrayList<Pair>();
+        var reinsert = new ArrayList<UnconfirmedOrder>();
+        var remove = new ArrayList<UnconfirmedOrder>();
 
-        for (var pair : ordered) {
-            if (pair.timestamp().plus(Duration.ofMillis(offset)).isBefore(time)) {
-                reinsert.add(new Pair(time, pair.order(), pair.restaurant_id()));
-                remove.add(pair);
+        for (var order : orders) {
+            if (order.timestamp().plus(Duration.ofMillis(offset)).isBefore(time)) {
+                reinsert.add(new UnconfirmedOrder(time, order.order()));
+                remove.add(order);
             }
         }
 
+        orders.removeIf(remove::contains);
+
         for (var order : reinsert) {
-            insert_order(order.order(), order.restaurant_id());
+            make_order(order.order());
         }
 
-        ordered.removeIf(remove::contains);
-        ordered.addAll(reinsert);
-
-        return !ordered.isEmpty();
+        return !orders.isEmpty();
     }
-}
 
-// @formatter:off
-record Pair(Instant timestamp, Order order, int restaurant_id) {}
-// @formatter:on
+    /**
+     * Chooses from database restaurant that prepares meals from given category.
+     *
+     * @param category meal category prepared in restaurant
+     * @return ID of restaurant or `null` if no restaurant with given category was found.
+     */
+    Integer get_restaurant(String category) {
+        try {
+            var restaurants = mapper.restaurants().get(category).all();
+            if (restaurants.isEmpty()) {
+                synchronized (this) {
+                    missed_reads += 1;
+                }
+                return null;
+            }
+            var index = random.nextInt(restaurants.size());
+
+            return restaurants.get(index).restaurant_id();
+        } catch (NoNodeAvailableException error) {
+            log.warn("Client #{} failed to retrieve restaurants. Cause: {}", id, error.getMessage());
+            synchronized (this) {
+                missed_reads += 1;
+            }
+        } catch (Exception error) {
+            log.warn("Client #{} failed to retrieve restaurants. Cause: {}", id, error.getMessage());
+            throw error;
+        }
+
+        return null;
+    }
+
+    // @formatter:off
+    record UnconfirmedOrder(Instant timestamp, Order order) {}
+    // @formatter:on
+}

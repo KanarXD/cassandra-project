@@ -73,7 +73,6 @@ public class RestaurantApplication extends Thread {
         }
     }
 
-
     /**
      * Sets time offset after which retry should be performed.
      *
@@ -140,8 +139,12 @@ public class RestaurantApplication extends Thread {
     private List<Ordered> get_last_orders() {
         return mapper.orders().get(id, last_timestamp).all();
     }
+
+    // @formatter:off
+    record UnconfirmedOrder(Instant timestamp, Ready order) {}
+    // @formatter:on
 }
 
-// @formatter:off
-record UnconfirmedOrder(Instant timestamp, Ready order) {}
-// @formatter:on
+//// @formatter:off
+//record UnconfirmedOrder(Instant timestamp, Ready order) {}
+//// @formatter:on
