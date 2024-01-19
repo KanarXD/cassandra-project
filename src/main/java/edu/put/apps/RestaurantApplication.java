@@ -39,7 +39,20 @@ public class RestaurantApplication extends Thread {
 
         while (true) {
             var requested = get_last_orders();
-            requested.removeIf(order -> last_orders.contains(order.order_id()));
+            if (!requested.isEmpty()) {
+                last_requested_timestamp = requested.get(0).timestamp();
+            }
+            requested.removeIf(order -> {
+                if (order.timestamp().isAfter(last_timestamp)) {
+                    last_timestamp = order.timestamp();
+                }
+                return last_orders.contains(order.order_id());
+            });
+            if (last_requested_timestamp.isAfter(last_timestamp.minus(5, ChronoUnit.SECONDS))) {
+                last_timestamp = last_requested_timestamp;
+            } else {
+                last_timestamp = last_timestamp.minus(5, ChronoUnit.SECONDS);
+            }
             last_orders = requested.stream().map(Ordered::order_id).toList();
 
             if (requested.isEmpty() && Thread.currentThread().isInterrupted()) {
@@ -85,9 +98,7 @@ public class RestaurantApplication extends Thread {
     }
 
     private void confirm_deliveries() {
-        for (var order : orders) {
-            confirm_delivery(order);
-        }
+        orders.removeIf(this::confirm_delivery);
     }
 
     private void confirm_delivery(UnconfirmedOrder order) {

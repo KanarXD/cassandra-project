@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import com.datastax.oss.driver.api.core.CqlSession;
 import edu.put.Main;
 import edu.put.apps.ClientApplication;
+import edu.put.apps.DeliveryApplication;
 import edu.put.apps.RestaurantApplication;
 import edu.put.backend.BackendSession;
 import edu.put.database.config.Config;
@@ -56,7 +57,8 @@ public class RunCommand implements Runnable {
 
             var client_apps = new ClientApplication[clients];
             var restaurant_apps = new RestaurantApplication[restaurants];
-//            var delivery_apps = new deliveryapplication[deliveries];
+            var delivery_apps = new DeliveryApplication[deliveries];
+
             log.info("starting restaurant applications.");
             for (int id = 0; id < restaurants; id++) {
                 var app = new RestaurantApplication(id, mapper, List.of("pizza", "kebab", "drink"));
@@ -69,6 +71,13 @@ public class RunCommand implements Runnable {
                 var app = new ClientApplication(id, mapper);
                 app.start();
                 client_apps[id] = app;
+            }
+
+            log.info("starting delivery applications.");
+            for (int id = 0; id < deliveries; id++) {
+                var app = new DeliveryApplication(id, mapper);
+                app.start();
+                delivery_apps[id] = app;
             }
 
             for (var app : client_apps) {
@@ -88,7 +97,7 @@ public class RunCommand implements Runnable {
             }
 
             // <DEBUG>
-            for (var app : restaurant_apps) {
+            for (var app : delivery_apps) {
                 try {
                     app.interrupt();
                 } catch (Exception error) {
@@ -96,6 +105,14 @@ public class RunCommand implements Runnable {
                 }
             }
             // </DEBUG>
+
+            for (var app : delivery_apps) {
+                try {
+                    app.join();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
 //        try (var cluster = cluster.builder().addcontactpoint(config.contact_point()).build()) {
 //            log.info("initializing session.");

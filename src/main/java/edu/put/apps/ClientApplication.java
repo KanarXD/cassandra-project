@@ -60,6 +60,7 @@ public class ClientApplication extends Thread {
 
     @Override
     public void run() {
+        log.info("start client: {}", id);
         try {
             for (int i = 0; i < 100; i++) {
                 prepare_order();
