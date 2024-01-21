@@ -107,7 +107,8 @@ public class InitCommand implements Runnable {
                         details CLIENT_ORDER,
                         PRIMARY KEY (date, timestamp, order_id)
                     )
-                    WITH CLUSTERING ORDER BY (timestamp ASC, order_id ASC);
+                    WITH gc_grace_seconds = 0
+                    AND CLUSTERING ORDER BY (timestamp ASC, order_id ASC);
                     """);
 
             session.execute("""
@@ -117,7 +118,8 @@ public class InitCommand implements Runnable {
                         details CLIENT_ORDER,
                         PRIMARY KEY (order_id, delivery_id)
                     )
-                    WITH CLUSTERING ORDER BY (delivery_id ASC);
+                    WITH default_time_to_live = 10
+                    AND CLUSTERING ORDER BY (delivery_id ASC);
                     """);
 
             session.execute("""

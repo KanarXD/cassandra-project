@@ -15,8 +15,9 @@ import java.util.*;
 public class ClientApplication extends Thread {
     private static final Object mutex = new Object();
     // Statistics.
-    private static int missed_writes = 0;
-    private static int missed_reads = 0;
+    public static int total_writes = 0;
+    public static int missed_writes = 0;
+    public static int missed_reads = 0;
 
     // App Configuration parameters.
     private final int id;
@@ -27,20 +28,6 @@ public class ClientApplication extends Thread {
     // Internal app state.
     private final Random random = new Random();
     private final List<UnconfirmedOrder> orders = new ArrayList<>();
-
-    /**
-     * @return number of failed writes performed by all clients.
-     */
-    public int missed_writes() {
-        return missed_writes;
-    }
-
-    /**
-     * @return number of failed reads performed by all clients.
-     */
-    public int missed_reads() {
-        return missed_reads;
-    }
 
     public ClientApplication(int id, DAO mapper) {
         this.id = id;
@@ -105,6 +92,7 @@ public class ClientApplication extends Thread {
             var ordered = new Ordered(restaurant, Instant.now(), order.id(), order);
             try {
                 log.trace("Client ${} inserting ordered: {}", id, ordered);
+                increase_total_writes();
                 if (!mapper.orders().insert(ordered)) {
                     log.warn("Order `{}` couldn't be inserted.", order);
                     synchronized (mutex) {
@@ -186,6 +174,12 @@ public class ClientApplication extends Thread {
         }
 
         return null;
+    }
+
+    private void increase_total_writes() {
+        synchronized (mutex) {
+            total_writes++;
+        }
     }
 
     // @formatter:off

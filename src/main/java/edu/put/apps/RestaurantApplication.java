@@ -20,8 +20,9 @@ import java.util.Random;
 public class RestaurantApplication extends Thread {
     private static final Object mutex = new Object();
     // Statistics
-    private static int missed_writes = 0;
-    private static int missed_reads = 0;
+    public static int total_writes = 0;
+    public static int missed_writes = 0;
+    public static int missed_reads = 0;
 
     // App configuration parameters.
     private final int id;
@@ -39,20 +40,6 @@ public class RestaurantApplication extends Thread {
     private boolean finish_requested = false;
 
     /**
-     * @return number of failed writes performed by all clients.
-     */
-    public int missed_writes() {
-        return missed_writes;
-    }
-
-    /**
-     * @return number of failed reads performed by all clients.
-     */
-    public int missed_reads() {
-        return missed_reads;
-    }
-
-    /**
      * Sets time offset after which retry should be performed.
      *
      * @param offset time in milliseconds
@@ -66,9 +53,10 @@ public class RestaurantApplication extends Thread {
     @Override
     public void run() {
         try {
-            for (var category : categories) {
-                mapper.restaurants().insert(new Restaurant(category, id));
-            }
+//            for (var category : categories) {
+//                mapper.restaurants().insert(new Restaurant(category, id));
+//            }
+            mapper.restaurants().insert(new Restaurant(categories.get(id % categories.size()), id));
 
             while (true) {
                 for (var order : get_last_orders()) {
@@ -102,6 +90,7 @@ public class RestaurantApplication extends Thread {
 
     private void confirm_order(Ordered order) {
         try {
+            increase_total_writes();
             mapper.confirm_order().insert(new OrderConfirmation(order.order_id(), id));
         } catch (Exception error) {
             log.warn("Couldn't insert order confirmation. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
@@ -119,6 +108,7 @@ public class RestaurantApplication extends Thread {
         try {
             var delivery = prepare_delivery(order);
             if (delivery == null) return false;
+            increase_total_writes();
             if (mapper.delivery().insert(delivery)) {
                 return true;
             }
@@ -152,6 +142,7 @@ public class RestaurantApplication extends Thread {
             orders.add(new UnconfirmedOrder(Instant.now(), order));
             var ttl = (int) Math.max(1.0f, (((float) offset / 1000.0f) + 0.5f));
 //            var ttl = 3600;
+            increase_total_writes();
             mapper.ready().insert(order, ttl);
         } catch (Exception error) {
             log.warn("Couldn't insert ready order. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
@@ -214,7 +205,13 @@ public class RestaurantApplication extends Thread {
         return List.of();
     }
 
+    private void increase_total_writes() {
+        synchronized (mutex) {
+            total_writes++;
+        }
+    }
     // @formatter:off
+
     record UnconfirmedOrder(Instant timestamp, Ready order) {}
     // @formatter:on
 }

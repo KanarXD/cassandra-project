@@ -34,8 +34,13 @@ public class RunCommand implements Runnable {
     boolean[] verbosity;
 
     private static void show_stats(long timeElapsed) {
-        // TODO: Gather stats and do bandwidth test.
-        log.info("Elapsed time: {}", timeElapsed);
+        log.info("ClientApplication missed_reads: {}, missed_writes: {}, total writes: {}", ClientApplication.missed_reads, ClientApplication.missed_writes, ClientApplication.total_writes);
+        log.info("RestaurantApplication missed_reads: {}, missed_writes: {}, total writes: {}", RestaurantApplication.missed_reads, RestaurantApplication.missed_writes, RestaurantApplication.total_writes);
+        log.info("DeliveryApplication missed_reads: {}, missed_writes: {}, total writes: {}", DeliveryApplication.missed_reads, DeliveryApplication.missed_writes, DeliveryApplication.total_writes);
+        var whole_writes = ClientApplication.total_writes + RestaurantApplication.total_writes + DeliveryApplication.total_writes;
+        log.info("Total writes for this example: {}", whole_writes);
+        log.info("Elapsed time: {}ms", timeElapsed);
+        log.info("Write performance: {}w/ms", whole_writes / timeElapsed);
     }
 
     @Override

@@ -24,8 +24,9 @@ import java.util.Random;
 public class DeliveryApplication extends Thread {
     private static final Object mutex = new Object();
     // Statistics.
-    private static int missed_writes = 0;
-    private static int missed_reads = 0;
+    public static int total_writes = 0;
+    public static int missed_writes = 0;
+    public static int missed_reads = 0;
 
     private final int id;
     private final DAO mapper;
@@ -41,7 +42,7 @@ public class DeliveryApplication extends Thread {
         try {
             while (!Thread.interrupted()) {
                 ask_for_confirmation();
-                Thread.sleep(random.nextInt(500));
+                Thread.sleep(random.nextInt(1000));
             }
         } catch (InterruptedException e) {
             log.info("Delivery Courier #{} received interrupt signal. Shutting down.", id);
@@ -71,11 +72,13 @@ public class DeliveryApplication extends Thread {
                 last_timestamp = order.timestamp();
                 if (i % 30 == 0) {
                     var batch = builder.build();
+                    increase_total_writes(batch.size());
                     session.execute(batch);
                     builder = BatchStatement.builder(BatchType.LOGGED);
                 }
             }
             var batch = builder.build();
+            increase_total_writes(batch.size());
             session.execute(batch);
         } catch (NoNodeAvailableException error) {
             log.warn("Couldn't request delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
@@ -95,5 +98,11 @@ public class DeliveryApplication extends Thread {
             }
         }
         return null;
+    }
+
+    private void increase_total_writes(int count) {
+        synchronized (mutex) {
+            total_writes += count;
+        }
     }
 }
