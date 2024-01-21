@@ -78,8 +78,10 @@ public class DeliveryApplication extends Thread {
                 }
             }
             var batch = builder.build();
-            increase_total_writes(batch.size());
-            session.execute(batch);
+            if (batch.size() > 0) {
+                increase_total_writes(batch.size());
+                session.execute(batch);
+            }
         } catch (NoNodeAvailableException error) {
             log.warn("Couldn't request delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
             synchronized (mutex) {
@@ -91,7 +93,7 @@ public class DeliveryApplication extends Thread {
     private List<Ready> getReadies() {
         try {
             var date = formatter.format(LocalDate.now());
-            return mapper.ready().get(date, last_timestamp.minus(1, ChronoUnit.MINUTES)).all();
+            return mapper.ready().get(date, last_timestamp.minus(1, ChronoUnit.MINUTES), 100).all();
         } catch (Exception e) {
             synchronized (mutex) {
                 missed_reads++;

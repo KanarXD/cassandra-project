@@ -108,7 +108,7 @@ public class InitCommand implements Runnable {
                         PRIMARY KEY (date, timestamp, order_id)
                     )
                     WITH gc_grace_seconds = 0
-                    AND CLUSTERING ORDER BY (timestamp ASC, order_id ASC);
+                    AND CLUSTERING ORDER BY (timestamp DESC, order_id ASC);
                     """);
 
             session.execute("""

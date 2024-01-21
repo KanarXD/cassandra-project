@@ -1,6 +1,7 @@
 package edu.put.database.dao;
 
 import com.datastax.oss.driver.api.core.PagingIterable;
+import com.datastax.oss.driver.api.mapper.annotations.CqlName;
 import com.datastax.oss.driver.api.mapper.annotations.Dao;
 import com.datastax.oss.driver.api.mapper.annotations.Insert;
 import com.datastax.oss.driver.api.mapper.annotations.Select;
@@ -12,6 +13,6 @@ public interface Ready {
     @Insert(ttl = ":ttl")
     boolean insert(edu.put.database.entities.Ready order, int ttl);
 
-    @Select(customWhereClause = "date = :date AND timestamp > :timestamp")
-    PagingIterable<edu.put.database.entities.Ready> get(String date, Instant timestamp);
+    @Select(customWhereClause = "date = :date AND timestamp > :timestamp", limit = ":l")
+    PagingIterable<edu.put.database.entities.Ready> get(String date, Instant timestamp, @CqlName("l") int l);
 }
