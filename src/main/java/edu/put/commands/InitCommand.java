@@ -105,9 +105,9 @@ public class InitCommand implements Runnable {
                         timestamp TIMESTAMP,
                         order_id VARCHAR,
                         details CLIENT_ORDER,
-                        PRIMARY KEY (date, timestamp)
+                        PRIMARY KEY (date, timestamp, order_id)
                     )
-                    WITH CLUSTERING ORDER BY (timestamp ASC);
+                    WITH CLUSTERING ORDER BY (timestamp ASC, order_id ASC);
                     """);
 
             session.execute("""

@@ -32,6 +32,7 @@ public class RunCommand implements Runnable {
     boolean[] verbosity;
 
     private static void show_stats(BackendSession session) {
+        // TODO: Gather stats and do bandwidth test.
 //        var mapper = new MappingManager(session.session()).mapper(Ready.class);
 //
 //        var results = session.execute("SELECT * FROM ready_orders;");
@@ -59,28 +60,28 @@ public class RunCommand implements Runnable {
             var restaurant_apps = new RestaurantApplication[restaurants];
             var delivery_apps = new DeliveryApplication[deliveries];
 
-            log.info("starting restaurant applications.");
+            log.info("Starting restaurant applications.");
             for (int id = 0; id < restaurants; id++) {
-                var app = new RestaurantApplication(id, mapper, List.of("pizza", "kebab", "drink"));
+                var app = new RestaurantApplication(id, mapper, List.of("pizza", "kebab", "drink")).with_retry_offset(15000);
                 app.start();
                 restaurant_apps[id] = app;
             }
 
-            log.info("starting client applications.");
+            log.info("Starting client applications.");
             for (int id = 0; id < clients; id++) {
-                var app = new ClientApplication(id, mapper);
+                var app = new ClientApplication(id, mapper).with_retry_offset(15000);
                 app.start();
                 client_apps[id] = app;
             }
 
-            log.info("starting delivery applications.");
+            log.info("Starting delivery applications.");
             for (int id = 0; id < deliveries; id++) {
                 var app = new DeliveryApplication(id, mapper);
                 app.start();
                 delivery_apps[id] = app;
             }
 
-            log.info("joining client applications.");
+            log.info("Joining client applications.");
             for (var app : client_apps) {
                 try {
                     app.join();
@@ -89,7 +90,7 @@ public class RunCommand implements Runnable {
                 }
             }
 
-            log.info("interrupting restaurant applications.");
+            log.info("Sending finish signal to restaurant applications.");
             for (var app : restaurant_apps) {
                 try {
                     app.interrupt();
@@ -98,18 +99,7 @@ public class RunCommand implements Runnable {
                 }
             }
 
-            // <DEBUG>
-//            log.info("interrupting delivery applications.");
-//            for (var app : delivery_apps) {
-//                try {
-//                    app.interrupt();
-//                } catch (Exception error) {
-//                    throw new RuntimeException(error);
-//                }
-//            }
-            // </DEBUG>
-
-            log.info("join restaurant applications.");
+            log.info("Joining restaurant applications.");
             for (var app : restaurant_apps) {
                 try {
                     app.join();
@@ -118,7 +108,16 @@ public class RunCommand implements Runnable {
                 }
             }
 
-            log.info("join delivery applications.");
+            log.info("Sending finish signal to delivery applications.");
+            for (var app : delivery_apps) {
+                try {
+                    app.interrupt();
+                } catch (Exception error) {
+                    throw new RuntimeException(error);
+                }
+            }
+
+            log.info("Joining delivery applications.");
             for (var app : delivery_apps) {
                 try {
                     app.join();
@@ -127,67 +126,7 @@ public class RunCommand implements Runnable {
                 }
             }
 
-
         }
-//        try (var cluster = cluster.builder().addcontactpoint(config.contact_point()).build()) {
-//            log.info("initializing session.");
-//            var session = new backendsession(cluster.connect(config.keyspace()));
-//            var manager = new mappingmanager(session.session());
-//
-//            log.info("starting client applications.");
-//            for (int id = 0; id < clients; id++) {
-//                var app = new clientapplication(id, session, manager);
-//                app.start();
-//                client_apps[id] = app;
-//            }
-//
-//            log.info("starting restaurant applications.");
-//            for (int id = 0; id < restaurants; id++) {
-//                var app = new restaurantapplication(id, session);
-//                app.start();
-//                restaurant_apps[id] = app;
-//            }
-//
-////            log.info("starting delivery applications.");
-////            for (int id = 0; id < deliveries; id++) {
-////                var app = new deliveryapplication(id, session);
-////                app.start();
-////                delivery_apps[id] = app;
-////            }
-//
-//            log.info("waiting for clients to finish.");
-//            for (int i = 0; i < clients; i++) {
-//                client_apps[i].join();
-//            }
-//            log.info("clients finished.");
-//
-////            thread.sleep(20000);
-//
-//            log.debug("sending finish signal to restaurants.");
-//
-//            for (int i = 0; i < restaurants; i++) {
-//                restaurant_apps[i].interrupt();
-//            }
-//
-//            for (int i = 0; i < restaurants; i++) {
-//                restaurant_apps[i].join();
-//            }
-//            log.info("restaurants finished.");
-//
-////            for (int i = 0; i < deliveries; i++) {
-////                delivery_apps[i].interrupt();
-////            }
-////
-////            for (int i = 0; i < deliveries; i++) {
-////                delivery_apps[i].join();
-////            }
-//            log.info("deliveries finished.");
-//
-//            show_stats(session);
-//        } catch (InterruptedException e) {
-//            // TODO: Give some explanation here.
-//            throw new RuntimeException(e);
-//        }
     }
 
     void configure_logging() {
@@ -200,16 +139,22 @@ public class RunCommand implements Runnable {
             default -> Level.ALL;
         };
 
-
+        // @formatter:off
         var loggers = List.of(
                 ClientApplication.class,
                 DeliveryApplication.class,
                 RestaurantApplication.class,
-                BackendSession.class, InitCommand.class, RunCommand.class,
+                BackendSession.class,
+                InitCommand.class,
+                RunCommand.class,
 //                Ordered.class,
 //                Delivered.class,
 //                Ready.class,
-                Config.class, Replication.class, Main.class);
+                Config.class,
+                Replication.class,
+                Main.class
+        );
+        // @formatter:on
 
         for (var clazz : loggers) {
             Logger logger = (Logger) LoggerFactory.getLogger(clazz);

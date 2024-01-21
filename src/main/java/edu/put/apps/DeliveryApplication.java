@@ -24,11 +24,10 @@ public class DeliveryApplication extends Thread {
     // Can be changed to some more sane value, like yesterday at midnight.
     private Instant last_timestamp = Instant.ofEpochSecond(0);
 
-    @SuppressWarnings("InfiniteLoopStatement")
     @Override
     public void run() {
         try {
-            for (int i =0 ; i<100;i++) {
+            while (!Thread.interrupted()) {
                 ask_for_confirmation();
                 Thread.sleep(random.nextInt(500));
             }

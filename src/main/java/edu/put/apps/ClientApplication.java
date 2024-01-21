@@ -57,7 +57,6 @@ public class ClientApplication extends Thread {
         return this;
     }
 
-
     @Override
     public void run() {
         log.info("start client: {}", id);
@@ -65,13 +64,16 @@ public class ClientApplication extends Thread {
             for (int i = 0; i < 100; i++) {
                 var order = prepare_order();
                 make_order(order);
-//                retry_pending_orders();
+                check_confirmed_orders();
+                retry_pending_orders();
                 Thread.sleep(random.nextInt(100));
             }
 
-//            while (retry_pending_orders()) {
-//                Thread.sleep(offset);
-//            }
+            while (!orders.isEmpty()) {
+                check_confirmed_orders();
+                retry_pending_orders();
+                Thread.sleep(random.nextInt(2000));
+            }
             log.trace("Client #{} made all their orders.", id);
 
         } catch (Exception error) {
@@ -94,100 +96,64 @@ public class ClientApplication extends Thread {
         return null;
     }
 
-    private void check_confirmed() {
-        try {
-            var remove = new ArrayList<UnconfirmedOrder>();
-            for (var order : orders) {
-                if (mapper.confirm_order().get(order.order().id()) != null) {
-                    remove.add(order);
-                }
-            }
-
-            orders.removeIf(remove::contains);
-
-        } catch (NoNodeAvailableException error) {
-            log.warn("Couldn't confirm delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
-        }
-    }
-
     private void make_order(Order order) {
         orders.add(new UnconfirmedOrder(Instant.now(), order));
 
-        Optional<Integer> restaurant;
-        do {
-            restaurant = Optional.ofNullable(get_restaurant(order.category()));
-        } while (restaurant.isEmpty());
-
-//        if (restaurant != null) {
-        var ordered = new Ordered(restaurant.get(), Instant.now(), order.id(), order);
-        try {
-            log.trace("Client ${} inserting ordered: {}", id, ordered);
-            if (!mapper.orders().insert(ordered)) {
-                log.warn("Order `{}` couldn't be inserted.", order);
+        var restaurant = get_restaurant(order.category());
+        if (restaurant != null) {
+            var ordered = new Ordered(restaurant, Instant.now(), order.id(), order);
+            try {
+                log.trace("Client ${} inserting ordered: {}", id, ordered);
+                if (!mapper.orders().insert(ordered)) {
+                    log.warn("Order `{}` couldn't be inserted.", order);
+                    synchronized (this) {
+                        missed_writes += 1;
+                    }
+                }
+            } catch (NoNodeAvailableException error) {
+                log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
                 synchronized (this) {
                     missed_writes += 1;
                 }
+            } catch (Exception error) {
+                log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
+                throw error;
             }
-        } catch (NoNodeAvailableException error) {
-            log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
-            synchronized (this) {
-                missed_writes += 1;
-            }
-        } catch (Exception error) {
-            log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
-            throw error;
         }
-//        } else {
-//            log.warn("Client #{} failed to make order no restaurants", id);
-//        }
     }
 
-//    private void insert_order(Order order) {
-//        try {
-//            var restaurants = mapper.restaurants().get(order.category()).all().stream().toList();
-//            if (restaurants.isEmpty()) {
-//                log.warn("No restaurants available for performing order: `{}`.", order);
-//                synchronized (this) {
-//                    uninserted += 1;
-//                }
-//                return;
-//            }
-//            var restaurant = restaurants.get(random.nextInt(restaurants.size()));
-//
-//            insert_order(order, restaurant.restaurant_id());
-//        } catch (NoNodeAvailableException error) {
-//            log.warn("Client #{} encountered problem (probably overloaded cassandra nodes): {}", id, error.getMessage());
-//        } catch (Exception error) {
-//            log.warn("Client #{} encountered error: {}", id, error.getStackTrace());
-//        }
-//    }
+    private void check_confirmed_orders() {
+        try {
+            orders.removeIf(order -> mapper.confirm_order().get(order.order().id()) != null);
+        } catch (Exception error) {
+            log.warn("Couldn't confirm delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
+            synchronized (this) {
+                missed_reads += 1;
+            }
+        }
+    }
 
     /**
      * This is implementation of timeout-retry policy of orders.
      * Every order made (or failed to made) is held in local list with their insertion time.
      * If insertion time is older than retry offset we're reinserting order into database.
-     *
-     * @return whether there are orders to retry yet.
      */
-    boolean retry_pending_orders() {
+    void retry_pending_orders() {
         var time = Instant.now();
         var reinsert = new ArrayList<UnconfirmedOrder>();
-        var remove = new ArrayList<UnconfirmedOrder>();
 
-        for (var order : orders) {
+        var iterator = orders.iterator();
+        while (iterator.hasNext()) {
+            var order = iterator.next();
             if (order.timestamp().plus(Duration.ofMillis(offset)).isBefore(time)) {
                 reinsert.add(new UnconfirmedOrder(time, order.order()));
-                remove.add(order);
+                iterator.remove();
             }
         }
-
-        orders.removeIf(remove::contains);
 
         for (var order : reinsert) {
             make_order(order.order());
         }
-
-        return !orders.isEmpty();
     }
 
     /**
@@ -225,3 +191,4 @@ public class ClientApplication extends Thread {
     record UnconfirmedOrder(Instant timestamp, Order order) {}
     // @formatter:on
 }
+

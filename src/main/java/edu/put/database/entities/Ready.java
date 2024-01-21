@@ -14,6 +14,7 @@ public record Ready(
         String date,
         @ClusteringColumn
         Instant timestamp,
+        @ClusteringColumn(1)
         String order_id,
         @CqlName("details")
         Order order

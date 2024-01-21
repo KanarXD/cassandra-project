@@ -9,8 +9,8 @@ import java.time.Instant;
 
 @Dao
 public interface Ready {
-    @Insert
-    boolean insert(edu.put.database.entities.Ready order);
+    @Insert(ttl = ":ttl")
+    boolean insert(edu.put.database.entities.Ready order, int ttl);
 
     @Select(customWhereClause = "date = :date AND timestamp > :timestamp")
     PagingIterable<edu.put.database.entities.Ready> get(String date, Instant timestamp);
