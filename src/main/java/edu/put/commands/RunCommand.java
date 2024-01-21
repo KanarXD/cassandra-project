@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -31,27 +33,14 @@ public class RunCommand implements Runnable {
     @CommandLine.Option(names = {"-v", "--verbose"})
     boolean[] verbosity;
 
-    private static void show_stats(BackendSession session) {
+    private static void show_stats(long timeElapsed) {
         // TODO: Gather stats and do bandwidth test.
-//        var mapper = new MappingManager(session.session()).mapper(Ready.class);
-//
-//        var results = session.execute("SELECT * FROM ready_orders;");
-//        var orders = mapper.map(results).all().stream().map(Ready::getInfo).toList();
-//
-//        var unique_orders = new HashSet<>(orders);
-//
-//        log.info("""
-//
-//                Orders delivered: {}
-//                Unique orders delivered: {},
-//                Error rate: {}""",
-//                orders.size(), unique_orders.size(), String.format("%.04f", 1.0f - ((float) unique_orders.size() / (float) orders.size())));
+        log.info("Elapsed time: {}", timeElapsed);
     }
 
     @Override
     public void run() {
         configure_logging();
-
         var config = Config.load("config.properties").with_keyspace(keyspace);
         try (var session = CqlSession.builder().withLocalDatacenter("datacenter1").withKeyspace(config.keyspace()).build()) {
             var mapper = new DAOBuilder(session).build();
@@ -59,6 +48,8 @@ public class RunCommand implements Runnable {
             var client_apps = new ClientApplication[clients];
             var restaurant_apps = new RestaurantApplication[restaurants];
             var delivery_apps = new DeliveryApplication[deliveries];
+
+            Instant start = Instant.now();
 
             log.info("Starting restaurant applications.");
             for (int id = 0; id < restaurants; id++) {
@@ -76,7 +67,7 @@ public class RunCommand implements Runnable {
 
             log.info("Starting delivery applications.");
             for (int id = 0; id < deliveries; id++) {
-                var app = new DeliveryApplication(id, mapper);
+                var app = new DeliveryApplication(id, mapper, session);
                 app.start();
                 delivery_apps[id] = app;
             }
@@ -126,7 +117,11 @@ public class RunCommand implements Runnable {
                 }
             }
 
+            Instant finish = Instant.now();
+            long timeElapsed = Duration.between(start, finish).toMillis();
+            show_stats(timeElapsed);
         }
+
     }
 
     void configure_logging() {

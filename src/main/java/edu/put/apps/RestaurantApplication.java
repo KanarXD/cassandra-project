@@ -18,6 +18,7 @@ import java.util.Random;
 @Slf4j
 @RequiredArgsConstructor
 public class RestaurantApplication extends Thread {
+    private static final Object mutex = new Object();
     // Statistics
     private static int missed_writes = 0;
     private static int missed_reads = 0;
@@ -104,7 +105,7 @@ public class RestaurantApplication extends Thread {
             mapper.confirm_order().insert(new OrderConfirmation(order.order_id(), id));
         } catch (Exception error) {
             log.warn("Couldn't insert order confirmation. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
-            synchronized (this) {
+            synchronized (mutex) {
                 missed_writes += 1;
             }
         }
@@ -139,7 +140,7 @@ public class RestaurantApplication extends Thread {
             return new Delivered(courier.order_id(), courier.delivery_id(), courier.order());
         } catch (Exception error) {
             log.warn("Couldn't confirm delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
-            synchronized (this) {
+            synchronized (mutex) {
                 missed_reads += 1;
             }
         }
@@ -149,12 +150,12 @@ public class RestaurantApplication extends Thread {
     private void insert_ready(Ready order) {
         try {
             orders.add(new UnconfirmedOrder(Instant.now(), order));
-//            var ttl = (int) Math.max(1.0f, (((float) offset / 1000.0f) + 0.5f));
-            var ttl = 3600;
+            var ttl = (int) Math.max(1.0f, (((float) offset / 1000.0f) + 0.5f));
+//            var ttl = 3600;
             mapper.ready().insert(order, ttl);
         } catch (Exception error) {
             log.warn("Couldn't insert ready order. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
-            synchronized (this) {
+            synchronized (mutex) {
                 missed_writes += 1;
             }
         }
@@ -205,7 +206,7 @@ public class RestaurantApplication extends Thread {
             return requested;
         } catch (Exception error) {
             log.warn("Couldn't retrieve last orders. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
-            synchronized (this) {
+            synchronized (mutex) {
                 missed_reads += 1;
             }
         }

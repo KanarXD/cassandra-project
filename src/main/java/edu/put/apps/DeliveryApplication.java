@@ -1,8 +1,13 @@
 package edu.put.apps;
 
+import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
+import com.datastax.oss.driver.api.core.cql.BatchStatementBuilder;
+import com.datastax.oss.driver.api.core.cql.BatchType;
 import edu.put.database.dao.DAO;
 import edu.put.database.entities.DeliveryConfirmation;
+import edu.put.database.entities.Ready;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -11,13 +16,20 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 @Slf4j
 @RequiredArgsConstructor
 public class DeliveryApplication extends Thread {
+    private static final Object mutex = new Object();
+    // Statistics.
+    private static int missed_writes = 0;
+    private static int missed_reads = 0;
+
     private final int id;
     private final DAO mapper;
+    private final CqlSession session;
     private final Random random = new Random();
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -39,16 +51,49 @@ public class DeliveryApplication extends Thread {
     }
 
     private void ask_for_confirmation() {
-        try {
-            var date = formatter.format(LocalDate.now());
-            var ready = mapper.ready().get(date, last_timestamp.minus(1, ChronoUnit.MINUTES)).all();
+        var ready = getReadies();
+        if (ready != null) {
+            confirm_delivieries(ready);
+        }
+    }
 
-            for (var order : ready) {
-                mapper.confirm_delivery().insert(new DeliveryConfirmation(order.order_id(), id, order.order()));
+    private void confirm_delivieries(List<Ready> ready) {
+        try {
+//            for (var order : ready) {
+//                mapper.confirm_delivery().insert(new DeliveryConfirmation(order.order_id(), id, order.order()));
+//                last_timestamp = order.timestamp();
+//            }
+            BatchStatementBuilder builder = BatchStatement.builder(BatchType.LOGGED);
+
+            for (int i = 0; i < ready.size(); i++) {
+                var order = ready.get(i);
+                builder.addStatement(mapper.confirm_delivery().save(new DeliveryConfirmation(order.order_id(), id, order.order())));
                 last_timestamp = order.timestamp();
+                if (i % 30 == 0) {
+                    var batch = builder.build();
+                    session.execute(batch);
+                    builder = BatchStatement.builder(BatchType.LOGGED);
+                }
             }
+            var batch = builder.build();
+            session.execute(batch);
         } catch (NoNodeAvailableException error) {
             log.warn("Couldn't request delivery. Cause: {}", String.join("\n", Arrays.stream(error.getStackTrace()).map(Object::toString).toList()));
+            synchronized (mutex) {
+                missed_writes++;
+            }
         }
+    }
+
+    private List<Ready> getReadies() {
+        try {
+            var date = formatter.format(LocalDate.now());
+            return mapper.ready().get(date, last_timestamp.minus(1, ChronoUnit.MINUTES)).all();
+        } catch (Exception e) {
+            synchronized (mutex) {
+                missed_reads++;
+            }
+        }
+        return null;
     }
 }

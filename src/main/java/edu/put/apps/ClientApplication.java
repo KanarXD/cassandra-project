@@ -13,6 +13,7 @@ import java.util.*;
 
 @Slf4j
 public class ClientApplication extends Thread {
+    private static final Object mutex = new Object();
     // Statistics.
     private static int missed_writes = 0;
     private static int missed_reads = 0;
@@ -106,13 +107,13 @@ public class ClientApplication extends Thread {
                 log.trace("Client ${} inserting ordered: {}", id, ordered);
                 if (!mapper.orders().insert(ordered)) {
                     log.warn("Order `{}` couldn't be inserted.", order);
-                    synchronized (this) {
+                    synchronized (mutex) {
                         missed_writes += 1;
                     }
                 }
             } catch (NoNodeAvailableException error) {
                 log.warn("Client #{} failed to make order. Cause: {}", id, error.getMessage());
-                synchronized (this) {
+                synchronized (mutex) {
                     missed_writes += 1;
                 }
             } catch (Exception error) {
